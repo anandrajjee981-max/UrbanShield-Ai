@@ -9,6 +9,10 @@ import { loginSchema, registerSchema } from '../validation/auth.schema.js';
 /**
  * Authentication routes. Each route only wires middleware to a controller
  * function - no business logic lives here.
+ *
+ * `/register`, `/login` and `/logout` manage the HTTP-only `access_token`
+ * cookie; the browser sends it back on every request, so no endpoint accepts a
+ * bearer token in the `Authorization` header.
  */
 const authRouter = Router();
 

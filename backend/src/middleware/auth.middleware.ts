@@ -1,43 +1,39 @@
 import { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import { AUTH_COOKIE_NAME } from '../config/auth-cookie.js';
 import { verifyAccessToken } from '../utils/jwt.js';
 import { ForbiddenError, UnauthorizedError } from '../utils/api-error.js';
 import { logger } from '../utils/logger.js';
 import type { UserRole } from '../types/auth.types.js';
 
 /**
- * Verifies the `Authorization: Bearer <token>` header and attaches the decoded
- * identity to `req.user`. Any missing, malformed, expired or tampered token is
- * rejected with 401.
+ * Cookie-only authentication.
+ *
+ * The JWT is read from the HTTP-only `access_token` cookie that the browser
+ * attaches automatically to every same-site request. There is deliberately no
+ * `Authorization: Bearer` fallback: the token is never exposed to JavaScript, so
+ * there is nothing for an XSS payload to steal and re-send from a header.
+ *
+ * A missing cookie is a 401, and so is a cookie that fails verification
+ * (bad signature, expired, wrong issuer/audience or a malformed payload).
  */
 export const authenticate = (req: Request, _res: Response, next: NextFunction): void => {
-  const authorizationHeader = req.headers.authorization;
+  const cookie: unknown = req.cookies?.[AUTH_COOKIE_NAME];
 
-  if (!authorizationHeader) {
-    next(new UnauthorizedError('Authentication required. Provide a Bearer token', 'MISSING_TOKEN'));
-    return;
-  }
-
-  const [scheme, token, ...extra] = authorizationHeader.trim().split(/\s+/);
-
-  if (scheme?.toLowerCase() !== 'bearer' || !token || extra.length > 0) {
-    next(new UnauthorizedError('Invalid authorization header. Expected: Bearer <token>', 'INVALID_AUTH_HEADER'));
+  if (typeof cookie !== 'string' || cookie.length === 0) {
+    next(new UnauthorizedError('Authentication required', 'MISSING_TOKEN'));
     return;
   }
 
   try {
-    req.user = verifyAccessToken(token);
+    req.user = verifyAccessToken(cookie);
     next();
   } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
-      next(new UnauthorizedError('Access token has expired', 'TOKEN_EXPIRED'));
-      return;
-    }
-
-    if (error instanceof jwt.JsonWebTokenError) {
-      // The raw error (which may contain the token) is intentionally not logged.
-      logger.warn('Rejected access token', { reason: error.message, path: req.originalUrl });
-      next(new UnauthorizedError('Invalid access token', 'INVALID_TOKEN'));
+    if (error instanceof jwt.TokenExpiredError || error instanceof jwt.JsonWebTokenError) {
+      // The raw error may contain the token itself, so only the reason is logged
+      // and the client gets a single generic message.
+      logger.warn('Rejected authentication cookie', { reason: error.message, path: req.originalUrl });
+      next(new UnauthorizedError('Invalid or expired authentication', 'INVALID_TOKEN'));
       return;
     }
 

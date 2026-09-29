@@ -1,11 +1,20 @@
 /**
- * End-to-end smoke test for the authentication endpoints.
+ * End-to-end smoke test for the cookie-based authentication endpoints.
  *
  *   Terminal 1:  npm run dev
  *   Terminal 2:  npm run test:api
  *
+ * The script acts as a browser with a minimal cookie jar: it stores the
+ * `access_token` value from every `Set-Cookie` header and replays it in a
+ * `Cookie` header. It never sends an `Authorization` header, which is exactly
+ * what the frontend does now.
+ *
  * Every request uses a unique email, so the script can be run repeatedly.
  */
+
+import jwt from 'jsonwebtoken';
+import { AUTH_COOKIE_NAME } from '../src/config/auth-cookie.js';
+import { env } from '../src/config/env.js';
 
 const BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:4000';
 
@@ -18,24 +27,63 @@ interface TestResult {
   detail: string;
 }
 
+interface TestResponse {
+  status: number;
+  json: unknown;
+  raw: string;
+  setCookie: string;
+}
+
 const results: TestResult[] = [];
+
+/** Minimal cookie jar: cookie name -> value, as a browser would keep it. */
+let cookieJar = '';
+
+const storeCookie = (setCookieHeader: string): void => {
+  const [pair] = setCookieHeader.split(';');
+  const [name = '', ...valueParts] = (pair ?? '').split('=');
+  const value = valueParts.join('=').trim();
+
+  if (!name) return;
+
+  // `Max-Age=0` / `Expires` in the past means the browser drops the cookie.
+  if (/;\s*max-age=0(\D|$)/i.test(setCookieHeader)) {
+    cookieJar = cookieJar
+      .split('; ')
+      .filter((entry) => entry.split('=')[0] !== name)
+      .join('; ');
+    return;
+  }
+
+  const entry = `${name}=${value}`;
+  const otherEntries = cookieJar.split('; ').filter((item) => item && item.split('=')[0] !== name);
+
+  cookieJar = [...otherEntries, entry].join('; ');
+};
 
 const request = async (
   method: string,
   path: string,
   body?: unknown,
-  token?: string,
-): Promise<{ status: number; json: unknown; raw: string }> => {
+  extraHeaders: Record<string, string> = {},
+): Promise<TestResponse> => {
   const response = await fetch(`${BASE_URL}${path}`, {
     method,
     headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      ...(cookieJar ? { Cookie: cookieJar } : {}),
+      ...extraHeaders,
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 
   const raw = await response.text();
+  const setCookie = response.headers.getSetCookie().find((header) => header.startsWith(`${AUTH_COOKIE_NAME}=`)) ?? '';
+
+  if (setCookie) {
+    storeCookie(setCookie);
+  }
+
   let json: unknown = raw;
 
   try {
@@ -44,15 +92,10 @@ const request = async (
     /* keep the raw text */
   }
 
-  return { status: response.status, json, raw };
+  return { status: response.status, json, raw, setCookie };
 };
 
-const check = (
-  name: string,
-  passed: boolean,
-  status: number,
-  detail: string,
-): void => {
+const check = (name: string, passed: boolean, status: number, detail: string): void => {
   results.push({ name, passed, status, detail });
   const mark = passed ? 'PASS' : 'FAIL';
   process.stdout.write(`[${mark}] ${name} (${status}) - ${detail}\n`);
@@ -71,24 +114,34 @@ interface UserPayload {
 }
 
 const readUser = (json: unknown): UserPayload | null => {
-  const data = dataOf(json);
-  const user = asRecord(data.user);
+  const user = asRecord(dataOf(json).user);
 
   return typeof user.id === 'string' && typeof user.email === 'string' ? (user as unknown as UserPayload) : null;
 };
 
-const readToken = (json: unknown): string | null => {
-  const token = dataOf(json).token;
-  return typeof token === 'string' ? token : null;
-};
+/** Signs a token with the real secret that expired `secondsAgo` seconds ago. */
+const signExpiredToken = (userId: string, role: string, secondsAgo: number): string =>
+  jwt.sign({ userId, role }, env.JWT_SECRET, {
+    algorithm: 'HS256',
+    issuer: 'climate-smart-city-api',
+    audience: 'climate-smart-city-client',
+    subject: userId,
+    expiresIn: -secondsAgo,
+  });
 
 const uniqueEmail = (): string => `anand.${Date.now()}@example.com`;
 
-const main = async (): Promise<void> => {
-  process.stdout.write(`Testing ${BASE_URL}\n\n`);
+/** Reads the raw JWT value back out of the jar (a browser never exposes it). */
+const readCookieValue = (jar: string): string => {
+  const entry = jar.split('; ').find((item) => item.startsWith(`${AUTH_COOKIE_NAME}=`)) ?? '';
+  return entry.slice(AUTH_COOKIE_NAME.length + 1);
+};
 
-  let token = '';
+const main = async (): Promise<void> => {
+  process.stdout.write(`Testing ${BASE_URL} (cookie authentication)\n\n`);
+
   let email = uniqueEmail();
+  let userId = '';
 
   // 1. health
   {
@@ -96,7 +149,7 @@ const main = async (): Promise<void> => {
     check('GET /health', res.status === 200, res.status, `status ${res.status}`);
   }
 
-  // 2. register
+  // 2. register -> sets the cookie, returns no token
   {
     const res = await request('POST', '/api/auth/register', {
       name: 'Anand Raj',
@@ -105,23 +158,47 @@ const main = async (): Promise<void> => {
       role: 'CITIZEN',
     });
     const user = readUser(res.json);
-    token = readToken(res.json) ?? '';
+    userId = user?.id ?? '';
 
     check(
       'POST /api/auth/register (201)',
-      res.status === 201 && Boolean(user) && token.length > 20,
+      res.status === 201 && Boolean(user),
       res.status,
-      `user=${user?.email ?? 'none'} token=${token ? 'issued' : 'missing'}`,
+      `user=${user?.email ?? 'none'}`,
     );
     check(
-      'register response hides password_hash',
-      !res.raw.includes('password_hash') && !res.raw.includes(PASSWORD),
+      'register sets access_token cookie',
+      res.setCookie.startsWith(`${AUTH_COOKIE_NAME}=`) && cookieJar.length > 0,
       res.status,
-      'no hash or password in payload',
+      `${res.setCookie.split(';')[0] ?? 'none'}`,
+    );
+    check(
+      'register cookie is HttpOnly + SameSite=Lax',
+      /;\s*httponly/i.test(res.setCookie) && /;\s*samesite=lax/i.test(res.setCookie),
+      res.status,
+      res.setCookie,
+    );
+    check(
+      'register response hides token, password_hash and password',
+      !res.raw.includes('password_hash') && !res.raw.includes(PASSWORD) && !/"token"/i.test(res.raw),
+      res.status,
+      'body contains only safe user data',
     );
   }
 
-  // 3. register with a different case for the same email -> 409
+  // 3. register logs the user in: the cookie works immediately
+  {
+    const res = await request('GET', '/api/auth/me');
+    const user = readUser(res.json);
+    check(
+      'GET /api/auth/me with register cookie (200)',
+      res.status === 200 && user?.email === email,
+      res.status,
+      `user=${user?.email ?? 'none'}`,
+    );
+  }
+
+  // 4. duplicate email -> 409
   {
     const res = await request('POST', '/api/auth/register', {
       name: 'Anand Raj',
@@ -137,7 +214,7 @@ const main = async (): Promise<void> => {
     );
   }
 
-  // 4. register invalid payload -> 400
+  // 5. invalid payload -> 400
   {
     const res = await request('POST', '/api/auth/register', {
       name: 'A',
@@ -154,27 +231,44 @@ const main = async (): Promise<void> => {
     );
   }
 
-  // 5. login
+  // 6. logout the register session
+  {
+    const res = await request('POST', '/api/auth/logout');
+    check(
+      'POST /api/auth/logout clears the cookie (200)',
+      res.status === 200 && res.setCookie.length > 0 && !/;\s*max-age=\d*[1-9]/i.test(res.setCookie),
+      res.status,
+      `${res.setCookie.split(';')[0] ?? 'no clear header'} (jar=${cookieJar || 'empty'})`,
+    );
+    check('cookie jar is empty after logout', cookieJar === '', res.status, `jar=${cookieJar || 'empty'}`);
+  }
+
+  // 7. login -> sets a fresh cookie
   {
     const res = await request('POST', '/api/auth/login', { email, password: PASSWORD });
     const user = readUser(res.json);
-    token = readToken(res.json) ?? '';
 
     check(
       'POST /api/auth/login (200)',
-      res.status === 200 && user?.email === email && token.length > 20,
+      res.status === 200 && user?.email === email,
       res.status,
       `user=${user?.email ?? 'none'}`,
     );
     check(
-      'login response hides password_hash',
-      !res.raw.includes('password_hash') && !res.raw.includes(PASSWORD),
+      'login sets access_token cookie',
+      res.setCookie.startsWith(`${AUTH_COOKIE_NAME}=`) && /;\s*path=\//i.test(res.setCookie),
       res.status,
-      'no hash or password in payload',
+      res.setCookie,
+    );
+    check(
+      'login response hides token, password_hash and password',
+      !res.raw.includes('password_hash') && !res.raw.includes(PASSWORD) && !/"token"/i.test(res.raw),
+      res.status,
+      'body contains only safe user data',
     );
   }
 
-  // 6. login with wrong password -> 401
+  // 8. wrong password -> 401
   {
     const res = await request('POST', '/api/auth/login', { email, password: 'wrong-password' });
     check(
@@ -185,7 +279,7 @@ const main = async (): Promise<void> => {
     );
   }
 
-  // 7. login with unknown email -> 401 (same message, no user enumeration)
+  // 9. unknown email -> 401 (same message, no user enumeration)
   {
     const res = await request('POST', '/api/auth/login', {
       email: 'nobody.here@example.com',
@@ -199,15 +293,15 @@ const main = async (): Promise<void> => {
     );
   }
 
-  // 8. login missing fields -> 400
+  // 10. missing password -> 400
   {
     const res = await request('POST', '/api/auth/login', { email });
     check('POST /api/auth/login missing password (400)', res.status === 400, res.status, 'password is required');
   }
 
-  // 9. GET /me with a valid token
+  // 11. protected route with the session cookie
   {
-    const res = await request('GET', '/api/auth/me', undefined, token);
+    const res = await request('GET', '/api/auth/me');
     const user = readUser(res.json);
     check(
       'GET /api/auth/me (200)',
@@ -215,57 +309,116 @@ const main = async (): Promise<void> => {
       res.status,
       `user=${user?.email ?? 'none'}`,
     );
-    check(
-      'GET /api/auth/me hides password_hash',
-      !res.raw.includes('password_hash'),
-      res.status,
-      'no hash in payload',
-    );
+    check('GET /api/auth/me hides password_hash', !res.raw.includes('password_hash'), res.status, 'no hash in payload');
   }
 
-  // 10. GET /me without a token -> 401
+  // 12. no cookie at all -> 401 "Authentication required"
   {
+    const saved = cookieJar;
+    cookieJar = '';
     const res = await request('GET', '/api/auth/me');
-    check('GET /api/auth/me no token (401)', res.status === 401, res.status, `message="${asRecord(res.json).message}"`);
-  }
-
-  // 11. GET /me with a tampered token -> 401
-  {
-    const res = await request('GET', '/api/auth/me', undefined, `${token}tampered`);
-    check('GET /api/auth/me tampered token (401)', res.status === 401, res.status, `code=${asRecord(res.json).code}`);
-  }
-
-  // 12. GET /me with a bad scheme -> 401
-  {
-    const response = await fetch(`${BASE_URL}/api/auth/me`, { headers: { Authorization: `Basic ${token}` } });
-    const json = (await response.json()) as unknown;
+    cookieJar = saved;
     check(
-      'GET /api/auth/me wrong scheme (401)',
-      response.status === 401,
-      response.status,
-      `code=${asRecord(json).code}`,
+      'GET /api/auth/me without cookie (401)',
+      res.status === 401 && asRecord(res.json).message === 'Authentication required',
+      res.status,
+      `message="${asRecord(res.json).message}"`,
     );
   }
 
-  // 13. POST /logout
+  // 13. tampered cookie -> 401 "Invalid or expired authentication"
   {
-    const res = await request('POST', '/api/auth/logout', undefined, token);
-    check('POST /api/auth/logout (200)', res.status === 200, res.status, `message="${asRecord(res.json).message}"`);
+    const saved = cookieJar;
+    cookieJar = `${AUTH_COOKIE_NAME}=not-a-jwt`;
+    const res = await request('GET', '/api/auth/me');
+    cookieJar = saved;
+    check(
+      'GET /api/auth/me invalid cookie (401)',
+      res.status === 401 && asRecord(res.json).message === 'Invalid or expired authentication',
+      res.status,
+      `message="${asRecord(res.json).message}"`,
+    );
   }
 
-  // 14. POST /logout without a token -> 401
+  // 14. structurally valid but wrongly signed cookie -> 401
+  {
+    const saved = cookieJar;
+    cookieJar = `${AUTH_COOKIE_NAME}=${readCookieValue(saved).slice(0, -2)}xy`;
+    const res = await request('GET', '/api/auth/me');
+    cookieJar = saved;
+    check(
+      'GET /api/auth/me tampered signature (401)',
+      res.status === 401 && asRecord(res.json).message === 'Invalid or expired authentication',
+      res.status,
+      `code=${asRecord(res.json).code}`,
+    );
+  }
+
+  // 15. genuinely expired cookie -> 401
+  {
+    const saved = cookieJar;
+    cookieJar = `${AUTH_COOKIE_NAME}=${signExpiredToken(userId, 'CITIZEN', 60)}`;
+    const res = await request('GET', '/api/auth/me');
+    cookieJar = saved;
+    check(
+      'GET /api/auth/me expired cookie (401)',
+      res.status === 401 && asRecord(res.json).message === 'Invalid or expired authentication',
+      res.status,
+      `message="${asRecord(res.json).message}"`,
+    );
+  }
+
+  // 16. the token in an Authorization header is ignored: cookie-only
+  {
+    const saved = cookieJar;
+    const token = readCookieValue(saved);
+    cookieJar = '';
+    const res = await request('GET', '/api/auth/me', undefined, { Authorization: `Bearer ${token}` });
+    cookieJar = saved;
+    check(
+      'GET /api/auth/me with Bearer header only (401)',
+      res.status === 401,
+      res.status,
+      'bearer tokens are not accepted',
+    );
+  }
+
+  // 17. logout
   {
     const res = await request('POST', '/api/auth/logout');
-    check('POST /api/auth/logout no token (401)', res.status === 401, res.status, 'middleware protects logout');
+    check(
+      'POST /api/auth/logout (200)',
+      res.status === 200 && asRecord(res.json).message === 'Logout successful',
+      res.status,
+      `message="${asRecord(res.json).message}"`,
+    );
   }
 
-  // 15. unknown route -> 404
+  // 18. GET /me after logout -> 401 (the browser dropped the cookie)
+  {
+    const res = await request('GET', '/api/auth/me');
+    check(
+      'GET /api/auth/me after logout (401)',
+      res.status === 401,
+      res.status,
+      `message="${asRecord(res.json).message}"`,
+    );
+  }
+
+  // 19. logout without a cookie -> 401 (route stays protected)
+  {
+    cookieJar = '';
+    const res = await request('POST', '/api/auth/logout');
+    check('POST /api/auth/logout no cookie (401)', res.status === 401, res.status, 'middleware protects logout');
+  }
+
+  // 20. unknown route -> 404
   {
     const res = await request('GET', '/api/auth/does-not-exist');
     check('GET /api/auth/does-not-exist (404)', res.status === 404, res.status, `code=${asRecord(res.json).code}`);
   }
 
-  // 16. malformed JSON -> 400
+  // 21. malformed JSON -> 400
   {
     const response = await fetch(`${BASE_URL}/api/auth/login`, {
       method: 'POST',
@@ -281,7 +434,43 @@ const main = async (): Promise<void> => {
     );
   }
 
-  // 17. role AUTHORITY can be registered
+  // 22. CORS preflight allows the frontend origin with credentials
+  {
+    const response = await fetch(`${BASE_URL}/api/auth/login`, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'http://localhost:5173',
+        'Access-Control-Request-Method': 'POST',
+      },
+    });
+    check(
+      'CORS preflight from FRONTEND_URL allows credentials',
+      response.status === 204 &&
+        response.headers.get('access-control-allow-origin') === 'http://localhost:5173' &&
+        response.headers.get('access-control-allow-credentials') === 'true',
+      response.status,
+      `allow-origin=${response.headers.get('access-control-allow-origin')} allow-credentials=${response.headers.get('access-control-allow-credentials')}`,
+    );
+  }
+
+  // 23. CORS preflight from an unknown origin is blocked
+  {
+    const response = await fetch(`${BASE_URL}/api/auth/login`, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'https://evil.example.com',
+        'Access-Control-Request-Method': 'POST',
+      },
+    });
+    check(
+      'CORS preflight from unknown origin is blocked',
+      response.headers.get('access-control-allow-origin') === null,
+      response.status,
+      `allow-origin=${response.headers.get('access-control-allow-origin') ?? 'none'}`,
+    );
+  }
+
+  // 24. role AUTHORITY can be registered
   {
     const res = await request('POST', '/api/auth/register', {
       name: 'City Authority',
@@ -298,7 +487,7 @@ const main = async (): Promise<void> => {
     );
   }
 
-  // 18. role defaults to CITIZEN
+  // 25. role defaults to CITIZEN
   {
     const res = await request('POST', '/api/auth/register', {
       name: 'Default Role',

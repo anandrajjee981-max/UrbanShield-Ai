@@ -6,13 +6,16 @@ import { loginSchema, registerSchema } from '../validation/auth.schema.js';
 import { ConflictError, UnauthorizedError } from '../utils/api-error.js';
 import { signAccessToken } from '../utils/jwt.js';
 import { hashPassword, simulatePasswordComparison, verifyPassword } from '../utils/password.js';
-import { env } from '../config/env.js';
 
-/** Payload returned to the controller on a successful register/login. */
+/**
+ * Internal result of a successful register/login.
+ *
+ * `token` is returned to the controller so it can be written to the HTTP-only
+ * cookie; it is never serialised into an API response body.
+ */
 export interface AuthResult {
   user: SafeUser;
   token: string;
-  expiresIn: string;
 }
 
 /**
@@ -21,11 +24,10 @@ export interface AuthResult {
  */
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 
-/** Builds the safe user payload plus a signed access token. */
+/** Builds the safe user payload plus a signed access token for the cookie. */
 const issueSession = (user: User): AuthResult => ({
   user: toSafeUser(user),
   token: signAccessToken({ userId: user.id, role: user.role }),
-  expiresIn: env.JWT_EXPIRES_IN,
 });
 
 /**

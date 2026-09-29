@@ -36,10 +36,44 @@ const envSchema = z.object({
 
   BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(4).max(15).default(12),
 
-  CLIENT_ORIGIN: z.string().url('CLIENT_ORIGIN must be a valid origin').default('http://localhost:5173'),
+  /**
+   * Browser origin(s) allowed by CORS. Credentials (cookies) are enabled, so
+   * this must be an explicit origin - `*` is rejected by the browser. Several
+   * origins can be listed separated by commas, e.g. for staging deployments.
+   */
+  FRONTEND_URL: z
+    .string()
+    .min(1, 'FRONTEND_URL is required (e.g. http://localhost:5173)')
+    .default('http://localhost:5173')
+    .transform((value) =>
+      value
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter((origin) => origin.length > 0),
+    )
+    .refine(
+      (origins) =>
+        origins.length > 0 &&
+        origins.every((origin) => {
+          try {
+            const { protocol, hostname } = new URL(origin);
+            return (protocol === 'http:' || protocol === 'https:') && hostname.length > 0;
+          } catch {
+            return false;
+          }
+        }),
+      'FRONTEND_URL must be a comma separated list of valid origins (e.g. http://localhost:5173)',
+    ),
 });
 
-const parsedEnv = envSchema.safeParse(process.env);
+// `CLIENT_ORIGIN` is the previous name of `FRONTEND_URL` and is still honoured
+// so existing deployments do not break when they upgrade.
+const rawEnv = {
+  ...process.env,
+  FRONTEND_URL: process.env.FRONTEND_URL ?? process.env.CLIENT_ORIGIN,
+};
+
+const parsedEnv = envSchema.safeParse(rawEnv);
 
 if (!parsedEnv.success) {
   // Only field names and validation messages are printed - never the values.
@@ -54,6 +88,9 @@ if (!parsedEnv.success) {
 export const env = parsedEnv.data;
 
 export type Env = typeof env;
+
+/** Origins accepted by CORS (parsed from `FRONTEND_URL`). */
+export const FRONTEND_ORIGINS: readonly string[] = env.FRONTEND_URL;
 
 export const isProduction = env.NODE_ENV === 'production';
 export const isDevelopment = env.NODE_ENV === 'development';
