@@ -7,7 +7,9 @@
  * Authorization header to set.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000'
+// `VITE_API_URL` is kept as a fallback so this file stays compatible with the
+// original backend auth setup; `VITE_API_BASE_URL` is the canonical name.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'http://localhost:4000'
 
 /** Error carrying the `{ success: false, message, code }` envelope from the API. */
 export class ApiError extends Error {
