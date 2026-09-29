@@ -128,7 +128,7 @@ export default function Sidebar() {
     <>
       {/* Desktop rail / expanded panel */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 hidden shrink-0 transition-[width] duration-200 lg:block ${
+        className={`fixed inset-y-0 left-0 z-40 hidden shrink-0 transition-[width] duration-200 shadow-[3px_0_12px_rgba(6,42,58,0.08)] lg:block ${
           collapsed ? 'w-[76px]' : 'w-64'
         }`}
       >
