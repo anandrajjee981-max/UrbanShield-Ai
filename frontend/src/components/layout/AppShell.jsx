@@ -16,7 +16,7 @@ import { selectRealtimeConnected } from '../../redux/slices/notificationSlice.js
  * button in it would be wrong - while every signed-in area gets the sidebar,
  * header, mobile tab bar and the global toast stack.
  */
-const PUBLIC_PATHS = ['/', '/about']
+const PUBLIC_PATHS = ['/', '/about', '/login', '/register']
 
 function isPublicPath(pathname) {
   return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))

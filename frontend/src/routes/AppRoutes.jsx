@@ -3,6 +3,8 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute, { AccessDenied } from './ProtectedRoute.jsx'
 import { AdminArea, AuthorityArea, CitizenArea } from './RoleArea.jsx'
 import RoleHome from './RoleHome.jsx'
+import Login from '../pages/auth/Login'
+import Register from '../pages/auth/Register'
 
 /**
  * The route table.
@@ -45,6 +47,8 @@ export default function AppRoutes() {
       {/* ------------------------------ public ------------------------------ */}
       <Route path="/" element={<Landing />} />
       <Route path="/about" element={<About />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
 
       {/* One neutral URL that resolves to whichever home the role owns. */}
       <Route element={<ProtectedRoute />}>

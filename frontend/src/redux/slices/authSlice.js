@@ -14,7 +14,7 @@ export const loadSession = createAsyncThunk('auth/loadSession', async (_, { reje
   if (USE_MOCK) return MOCK_USERS.citizen
 
   try {
-    const payload = await get('/auth/me')
+    const payload = await get('/api/auth/me')
     return payload?.user ?? payload ?? null
   } catch (error) {
     if (error.status === 401 || error.status === 403) return null
@@ -38,6 +38,11 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
+    signedIn(state, action) {
+      state.user = action.payload
+      state.status = 'authenticated'
+      state.error = null
+    },
     signedOut(state) {
       state.user = null
       state.status = 'unauthenticated'
@@ -65,6 +70,6 @@ const authSlice = createSlice({
   },
 })
 
-export const { signedOut } = authSlice.actions
+export const { signedIn, signedOut } = authSlice.actions
 
 export default authSlice.reducer

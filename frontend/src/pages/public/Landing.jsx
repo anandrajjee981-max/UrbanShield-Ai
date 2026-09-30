@@ -117,8 +117,16 @@ export default function Landing() {
           </nav>
 
           <div className="flex items-center gap-2">
-            <ButtonLink to={isAuthenticated ? ROLE_HOME[role] ?? '/citizen' : '/citizen'} variant={isAuthenticated ? 'primary' : 'ghost'} size="sm">
-              {isAuthenticated ? 'Dashboard' : 'Sign in'}
+            {isAuthenticated ? (
+              <ButtonLink to={ROLE_HOME[role] ?? '/citizen'} variant="primary" size="sm">
+                Dashboard
+              </ButtonLink>
+            ) : null}
+            <ButtonLink to="/login" variant="ghost" size="sm">
+              Sign in
+            </ButtonLink>
+            <ButtonLink to="/register" variant="ghost" size="sm">
+              Register
             </ButtonLink>
             <ButtonLink to="/citizen" variant="primary" size="sm" className="hidden sm:inline-flex">
               Open platform
