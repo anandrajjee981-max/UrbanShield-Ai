@@ -5,9 +5,20 @@
 
 import { api } from './client.js'
 
-export const register = (payload) => api.post('/api/auth/register', payload).then((res) => res.data.user)
+const getUser = (response) => {
+  const user = response?.data?.user
+  return user ? { ...user, role: user.role?.toLowerCase() } : null
+}
 
-export const login = (payload) => api.post('/api/auth/login', payload).then((res) => res.data.user)
+export const register = (payload) =>
+  api
+    .post('/api/auth/register', {
+      ...payload,
+      role: payload.role?.toUpperCase(),
+    })
+    .then(getUser)
+
+export const login = (payload) => api.post('/api/auth/login', payload).then(getUser)
 
 export const logout = () => api.post('/api/auth/logout').then(() => undefined)
 
@@ -15,7 +26,7 @@ export const logout = () => api.post('/api/auth/logout').then(() => undefined)
 export const fetchCurrentUser = async () => {
   try {
     const res = await api.get('/api/auth/me')
-    return res.data.user
+    return getUser(res)
   } catch (error) {
     if (error?.status === 401) return null
     throw error

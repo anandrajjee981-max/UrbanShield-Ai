@@ -16,7 +16,7 @@ import { selectRealtimeConnected } from '../../redux/slices/notificationSlice.js
  * button in it would be wrong - while every signed-in area gets the sidebar,
  * header, mobile tab bar and the global toast stack.
  */
-const PUBLIC_PATHS = ['/', '/about']
+const PUBLIC_PATHS = ['/', '/about', '/login', '/register']
 
 function isPublicPath(pathname) {
   return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
@@ -47,23 +47,30 @@ export default function AppShell({ children }) {
       <div className={`flex min-h-screen flex-col transition-[padding] duration-200 ${collapsed ? 'lg:pl-[76px]' : 'lg:pl-64'}`}>
         <Header />
 
-        <div className="flex items-center justify-end gap-1.5 px-4 pt-3 text-[11px] lg:px-6">
-          <Radio
-            size={12}
-            className={connected ? 'text-brand-500' : 'text-muted'}
-            aria-hidden="true"
-            style={connected ? { animation: 'var(--animate-shimmer)' } : undefined}
-          />
-          <span className={connected ? 'font-medium text-brand-600' : 'text-muted'}>
-            {connected ? 'Live updates connected' : 'Reconnecting…'}
-          </span>
+        {/*
+         * The gutter between the rail and the page. It lives below the header so
+         * the sticky header still runs flush to the rail and page content never
+         * scrolls through the gap.
+         */}
+        <div className="flex flex-1 flex-col lg:px-4">
+          <div className="flex items-center justify-end gap-1.5 px-4 pt-3 text-[11px] lg:px-2">
+            <Radio
+              size={12}
+              className={connected ? 'text-brand-500' : 'text-muted'}
+              aria-hidden="true"
+              style={connected ? { animation: 'var(--animate-shimmer)' } : undefined}
+            />
+            <span className={connected ? 'font-medium text-brand-600' : 'text-muted'}>
+              {connected ? 'Live updates connected' : 'Reconnecting…'}
+            </span>
+          </div>
+
+          <main className="flex-1 pb-24 lg:pb-8">{children ?? <Outlet />}</main>
+
+          <footer className="hidden border-t border-line px-6 py-4 text-[11px] text-muted lg:block">
+            UbranShieldAI · AI-Powered Urban Risk &amp; Civic Intelligence Platform
+          </footer>
         </div>
-
-        <main className="flex-1 pb-24 lg:pb-8">{children ?? <Outlet />}</main>
-
-        <footer className="hidden border-t border-line px-6 py-4 text-[11px] text-muted lg:block">
-          UbranShieldAI · AI-Powered Urban Risk &amp; Civic Intelligence Platform
-        </footer>
       </div>
 
       <MobileNavigation />
