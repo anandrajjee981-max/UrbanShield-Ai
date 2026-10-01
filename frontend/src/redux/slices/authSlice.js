@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
 import { MOCK_USERS } from '../../mock/users.js'
-import { get, USE_MOCK } from '../../services/api.js'
+import { USE_MOCK } from '../../services/api.js'
+import { fetchCurrentUser, logout as requestLogout } from '../../api/auth.js'
 
 /**
  * Session state.
@@ -14,8 +15,7 @@ export const loadSession = createAsyncThunk('auth/loadSession', async (_, { reje
   if (USE_MOCK) return MOCK_USERS.citizen
 
   try {
-    const payload = await get('/api/auth/me')
-    return payload?.user ?? payload ?? null
+    return await fetchCurrentUser()
   } catch (error) {
     if (error.status === 401 || error.status === 403) return null
     return rejectWithValue(error.message)
@@ -26,6 +26,14 @@ export const loadSession = createAsyncThunk('auth/loadSession', async (_, { reje
 export const switchRole = createAsyncThunk('auth/switchRole', async (role) => {
   await new Promise((resolve) => setTimeout(resolve, 180))
   return MOCK_USERS[role] ?? MOCK_USERS.citizen
+})
+
+export const logoutUser = createAsyncThunk('auth/logout', async (_, { rejectWithValue }) => {
+  try {
+    await requestLogout()
+  } catch (error) {
+    return rejectWithValue(error.message ?? 'Sign out failed. Please try again.')
+  }
 })
 
 const initialState = {
@@ -65,6 +73,11 @@ const authSlice = createSlice({
       .addCase(switchRole.fulfilled, (state, action) => {
         state.user = action.payload
         state.status = 'authenticated'
+        state.error = null
+      })
+      .addCase(logoutUser.fulfilled, (state) => {
+        state.user = null
+        state.status = 'unauthenticated'
         state.error = null
       })
   },

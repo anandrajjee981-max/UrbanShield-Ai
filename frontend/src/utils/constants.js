@@ -183,7 +183,8 @@ export const NAV_MENUS = {
   citizen: [
     { label: 'Home', to: '/citizen', icon: Home, roles: [ROLES.CITIZEN] },
     { label: 'City Map', to: '/citizen/map', icon: Map, roles: [ROLES.CITIZEN] },
-    { label: 'Report an Issue', to: '/citizen/report', icon: Siren, roles: [ROLES.CITIZEN] },
+    { label: 'Live Report', to: '/citizen/live-report', icon: Siren, roles: [ROLES.CITIZEN] },
+    { label: 'Full Report Form', to: '/citizen/report', icon: FileText, roles: [ROLES.CITIZEN] },
     { label: 'My Reports', to: '/citizen/reports', icon: ListChecks, roles: [ROLES.CITIZEN] },
     { label: 'Notifications', to: '/citizen/notifications', icon: MessageSquare, badgeKey: 'unreadNotifications', roles: [ROLES.CITIZEN] },
     { label: 'Analytics', to: '/citizen/analytics', icon: BarChart3, roles: [ROLES.CITIZEN] },
@@ -196,7 +197,7 @@ export const NAV_MENUS = {
 export const MOBILE_NAV_ITEMS = [
   { label: 'Home', to: '/citizen', icon: Home, roles: [ROLES.CITIZEN] },
   { label: 'Map', to: '/citizen/map', icon: Map, roles: [ROLES.CITIZEN] },
-  { label: 'Report', to: '/citizen/report', icon: Siren, roles: [ROLES.CITIZEN], primary: true },
+  { label: 'Report', to: '/citizen/live-report', icon: Siren, roles: [ROLES.CITIZEN], primary: true },
   { label: 'Reports', to: '/citizen/reports', icon: FileText, roles: [ROLES.CITIZEN] },
   { label: 'Alerts', to: '/citizen/notifications', icon: MessageSquare, roles: [ROLES.CITIZEN] },
   { label: 'Dashboard', to: '/authority/dashboard', icon: Gauge, roles: [ROLES.AUTHORITY, ROLES.ADMIN] },

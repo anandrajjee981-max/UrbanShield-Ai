@@ -116,11 +116,11 @@ export const MOCK_WARD_BOUNDARIES = {
     const baseLng = CITY.center[1] - 0.15 + column * 0.075
 
     const coordinates = [
-      [baseLat, baseLng],
-      [baseLat, baseLng + 0.062],
-      [baseLat + 0.052, baseLng + 0.07],
-      [baseLat + 0.058, baseLng + 0.004],
-      [baseLat, baseLng],
+      [baseLng, baseLat],
+      [baseLng + 0.062, baseLat],
+      [baseLng + 0.07, baseLat + 0.052],
+      [baseLng + 0.004, baseLat + 0.058],
+      [baseLng, baseLat],
     ]
 
     return {

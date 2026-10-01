@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { USER_ROLES } from '../types/auth.types.js';
 
 /**
  * Request schemas. Validation runs in the `validateBody` middleware so the
@@ -33,7 +32,7 @@ export const registerSchema = z
     name: nameSchema,
     email: emailSchema,
     password: passwordSchema,
-    role: z.enum(USER_ROLES).default('CITIZEN'),
+    role: z.enum(['CITIZEN', 'AUTHORITY']).default('CITIZEN'),
   })
   .strict();
 

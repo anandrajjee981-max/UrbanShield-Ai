@@ -23,6 +23,7 @@ const NotFound = lazy(() => import('../pages/public/NotFound.jsx'))
 
 const CitizenHome = lazy(() => import('../pages/citizen/Home.jsx'))
 const ReportIssue = lazy(() => import('../pages/citizen/ReportIssue.jsx'))
+const LiveReport = lazy(() => import('../pages/citizen/LiveReport.jsx'))
 const MyReports = lazy(() => import('../pages/citizen/MyReports.jsx'))
 const CitizenReportDetail = lazy(() => import('../pages/citizen/ReportDetail.jsx'))
 const Notifications = lazy(() => import('../pages/citizen/Notifications.jsx'))
@@ -62,6 +63,7 @@ export default function AppRoutes() {
             <Route index element={<CitizenHome />} />
             <Route path="map" element={<CityMap />} />
             <Route path="report" element={<ReportIssue />} />
+            <Route path="live-report" element={<LiveReport />} />
             <Route path="reports" element={<MyReports />} />
             <Route path="reports/:id" element={<CitizenReportDetail />} />
             <Route path="notifications" element={<Notifications />} />

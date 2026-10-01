@@ -68,6 +68,7 @@ export default function ReportIssue() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [touched, setTouched] = useState({})
   const [submitted, setSubmitted] = useState(null)
+  const [photoError, setPhotoError] = useState('')
 
   useEffect(() => {
     document.title = 'Report an Issue · UbranShieldAI'
@@ -85,9 +86,6 @@ export default function ReportIssue() {
       if (!form.location) next.location = 'Pin the location on the map so the team can find it.'
       if (!form.ward) next.ward = 'Select the ward.'
     }
-    if (step === 2) {
-      if (!form.photos.length) next.photos = 'Add at least one photo, or continue anyway if you cannot.'
-    }
     if (step === 3) {
       if (!form.anonymous && !form.contactPhone.trim() && !form.contactEmail.trim()) {
         next.contact = 'Add a phone number or email, or tick "submit anonymously".'
@@ -102,7 +100,7 @@ export default function ReportIssue() {
   const stepErrors = Object.keys(errors).filter((key) => touched[key])
 
   function goNext() {
-    const stepKeys = { 0: ['issueType', 'description'], 1: ['location', 'ward'], 2: ['photos'], 3: ['contact'] }
+    const stepKeys = { 0: ['issueType', 'description'], 1: ['location', 'ward'] }
     const keys = stepKeys[step] ?? []
     const nextTouched = { ...touched }
     keys.forEach((key) => {
@@ -115,14 +113,32 @@ export default function ReportIssue() {
   }
 
   function handleFiles(event) {
-    const files = Array.from(event.target.files ?? []).slice(0, 4 - form.photos.length)
+    const selectedFiles = Array.from(event.target.files ?? [])
+    event.target.value = ''
+
+    if (selectedFiles.some((file) => !file.type.startsWith('image/'))) {
+      setPhotoError('Choose image files only.')
+      return
+    }
+    if (selectedFiles.some((file) => file.size > 10 * 1024 * 1024)) {
+      setPhotoError('Each photo must be 10 MB or smaller.')
+      return
+    }
+
+    const remaining = 4 - form.photos.length
+    if (remaining <= 0) {
+      setPhotoError('You can attach up to four photos.')
+      return
+    }
+
+    const files = selectedFiles.slice(0, remaining)
     const withUrls = files.map((file) => ({
       id: `${file.name}-${file.size}-${file.lastModified}`,
       name: file.name,
       url: URL.createObjectURL(file),
     }))
     update({ photos: [...form.photos, ...withUrls] })
-    event.target.value = ''
+    setPhotoError(selectedFiles.length > remaining ? 'Only four photos can be attached.' : '')
   }
 
   function removePhoto(id) {
@@ -132,6 +148,9 @@ export default function ReportIssue() {
   }
 
   async function handleSubmit() {
+    setTouched((current) => ({ ...current, contact: true }))
+    if (errors.contact || !selectedType || !form.location) return
+
     const payload = {
       issueType: selectedType.value,
       issueLabel: selectedType.label,
@@ -144,11 +163,13 @@ export default function ReportIssue() {
       longitude: form.location.longitude,
       photos: form.photos,
       priority: form.priority,
+      contactPhone: form.contactPhone.trim(),
+      contactEmail: form.contactEmail.trim(),
       anonymous: form.anonymous,
     }
 
     const result = await createReport(payload)
-    if (result.status === 'fulfilled') setSubmitted(result.payload)
+    if (result.meta.requestStatus === 'fulfilled') setSubmitted(result.payload)
   }
 
   /* ---------------------------- confirmation ---------------------------- */
@@ -218,6 +239,13 @@ export default function ReportIssue() {
           const state = index === step ? 'current' : index < step ? 'done' : 'todo'
           return (
             <li key={label} className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setStep(index)}
+                disabled={index >= step}
+                aria-label={index < step ? `Return to ${label}` : undefined}
+                className={`flex items-center gap-2 text-left ${index < step ? 'cursor-pointer' : 'cursor-default'}`}
+              >
               <span
                 className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${
                   state === 'current'
@@ -231,6 +259,7 @@ export default function ReportIssue() {
                 {state === 'done' ? '✓' : index + 1}
               </span>
               <span className={`text-[12px] ${state === 'current' ? 'font-semibold text-ink' : 'text-muted'}`}>{label}</span>
+              </button>
               {index < STEPS.length - 1 ? <span className="mx-1 h-px w-5 bg-line sm:w-8" aria-hidden="true" /> : null}
             </li>
           )
@@ -295,6 +324,7 @@ export default function ReportIssue() {
                   }}
                   onBlur={() => markTouched('description')}
                   rows={5}
+                  maxLength={600}
                   placeholder="What did you see, when did it start, and is anyone at risk? Mention anything that helps a crew prepare."
                   aria-invalid={Boolean(touched.description && errors.description)}
                   aria-describedby="report-description-help"
@@ -390,25 +420,23 @@ export default function ReportIssue() {
           {step === 2 ? (
             <section className="card p-5">
               <h2 className="text-base font-semibold text-ink">Add evidence</h2>
-              <p className="mt-1 text-[12px] text-muted">Up to four photos. A wide shot plus a close-up works best.</p>
+              <p className="mt-1 text-[12px] text-muted">Photos are optional. Add up to four if they help show the issue.</p>
 
-              <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-line bg-slate-50/60 px-4 py-8 text-center transition hover:border-brand-300 hover:bg-brand-50/40">
-                <Upload size={22} className="text-brand-600" aria-hidden="true" />
-                <span className="mt-2 text-[13px] font-semibold text-ink">Choose photos</span>
-                <span className="mt-0.5 text-[11px] text-muted">JPG or PNG, up to 4 files</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleFiles}
-                  disabled={form.photos.length >= 4}
-                  className="sr-only"
-                />
-              </label>
-              {touched.photos && errors.photos ? (
-                <p className="mt-2 text-[11px] font-medium text-risk-medium">{errors.photos}</p>
-              ) : null}
-
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-line bg-slate-50/60 px-4 py-6 text-center transition hover:border-brand-300 hover:bg-brand-50/40">
+                  <Camera size={22} className="text-brand-600" aria-hidden="true" />
+                  <span className="mt-2 text-[13px] font-semibold text-ink">Take a photo</span>
+                  <span className="mt-0.5 text-[11px] text-muted">Open your camera</span>
+                  <input type="file" accept="image/*" capture="environment" onChange={handleFiles} disabled={form.photos.length >= 4} className="sr-only" />
+                </label>
+                <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-line bg-slate-50/60 px-4 py-6 text-center transition hover:border-brand-300 hover:bg-brand-50/40">
+                  <Upload size={22} className="text-brand-600" aria-hidden="true" />
+                  <span className="mt-2 text-[13px] font-semibold text-ink">Upload photos</span>
+                  <span className="mt-0.5 text-[11px] text-muted">Choose up to 4 images, 10 MB each</span>
+                  <input type="file" accept="image/*" multiple onChange={handleFiles} disabled={form.photos.length >= 4} className="sr-only" />
+                </label>
+              </div>
+              {photoError ? <p role="alert" className="mt-2 text-[11px] font-medium text-risk-high">{photoError}</p> : null}
               {form.photos.length ? (
                 <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {form.photos.map((photo) => (
