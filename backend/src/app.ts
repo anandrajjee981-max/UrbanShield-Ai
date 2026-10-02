@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import { env, FRONTEND_ORIGINS } from './config/env.js';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware.js';
 import authRoutes from './routes/auth.routes.js';
+import issueRoutes from './routes/issue.routes.js';
 import { sendSuccess } from './utils/api-response.js';
 import { logger } from './utils/logger.js';
 
@@ -62,6 +63,7 @@ export const createApp = (): Express => {
   });
 
   app.use('/api/auth', authRoutes);
+  app.use('/api/issues', issueRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

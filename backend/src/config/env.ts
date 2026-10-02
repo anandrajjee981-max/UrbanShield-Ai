@@ -37,6 +37,38 @@ const envSchema = z.object({
   BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(4).max(15).default(12),
 
   /**
+   * ImageKit credentials for issue photos.
+   *
+   * Only the private key authenticates the server side upload performed in
+   * src/service/image.service.ts. The public key is validated as well because
+   * ImageKit issues the two together: requiring it catches a half filled .env
+   * at boot instead of failing on the first citizen upload. Neither value is
+   * ever sent to the client - see src/config/imagekit.ts.
+   */
+  IMAGEKIT_PUBLIC_KEY: z.string().min(1, 'IMAGEKIT_PUBLIC_KEY is required').startsWith('public_', 'IMAGEKIT_PUBLIC_KEY must start with "public_"'),
+
+  IMAGEKIT_PRIVATE_KEY: z
+    .string()
+    .min(1, 'IMAGEKIT_PRIVATE_KEY is required')
+    .startsWith('private_', 'IMAGEKIT_PRIVATE_KEY must start with "private_"'),
+
+  /** Upper bound for a single issue photo, enforced before any upload starts. */
+  ISSUE_IMAGE_MAX_BYTES: z.coerce.number().int().positive().default(5 * 1024 * 1024),
+
+  /**
+   * How many issues one authenticated citizen may report per minute. Anti spam
+   * only: a burst well above what a real complaint session needs.
+   */
+  ISSUE_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(60),
+
+  /**
+   * How many issue photos one authenticated citizen may upload per minute.
+   * Deliberately lower than the report limit because each upload stores bytes
+   * and a citizen attaching evidence needs a handful at most.
+   */
+  ISSUE_UPLOAD_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(20),
+
+  /**
    * Browser origin(s) allowed by CORS. Credentials (cookies) are enabled, so
    * this must be an explicit origin - `*` is rejected by the browser. Several
    * origins can be listed separated by commas, e.g. for staging deployments.
