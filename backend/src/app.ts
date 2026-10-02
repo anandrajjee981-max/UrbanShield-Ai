@@ -62,7 +62,7 @@ export const createApp = (): Express => {
     sendSuccess(res, 200, 'Service is healthy', { status: 'ok', environment: env.NODE_ENV });
   });
 
-  app.use('/api/auth', authRoutes);
+  app.use('/api/auth', authRoutes);//
   app.use('/api/issues', issueRoutes);
 
   app.use(notFoundHandler);
