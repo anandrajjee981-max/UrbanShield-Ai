@@ -93,7 +93,7 @@ export default function CityMapPage({ title, subtitle, authority }) {
               <MapSkeleton className="h-[560px]" />
             ) : (
               <RiskMap
-                height="h-[560px]"
+                height="h-[min(560px,60svh)] min-h-[360px] lg:h-[560px]"
                 riskZones={map.riskZones}
                 reports={map.reports}
                 infrastructure={map.infrastructure}

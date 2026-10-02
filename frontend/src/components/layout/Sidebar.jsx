@@ -1,10 +1,11 @@
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { ChevronLeft, LogOut, ShieldCheck, X } from 'lucide-react'
 import { APP_NAME, APP_SUBTITLE, NAV_MENUS, ROLES } from '../../utils/constants.js'
 import { selectRole, selectSidebarBadges } from '../../redux/selectors.js'
 import { selectSidebarCollapsed, setMobileNavOpen, toggleSidebar } from '../../redux/slices/uiSlice.js'
-import { switchRole } from '../../redux/slices/authSlice.js'
+import { logoutUser } from '../../redux/slices/authSlice.js'
+import { addToast } from '../../redux/slices/uiSlice.js'
 import RoleSwitcher from './RoleSwitcher.jsx'
 
 /**
@@ -94,7 +95,7 @@ function SidebarBody({ collapsed, badges, onNavigate, onSignOut }) {
 
       <div className="border-t border-white/10 p-3">
         {collapsed ? null : (
-          <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Demo role</p>
+          <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Signed in as</p>
         )}
         <RoleSwitcher collapsed={collapsed} />
 
@@ -104,10 +105,10 @@ function SidebarBody({ collapsed, badges, onNavigate, onSignOut }) {
           className={`mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition hover:bg-white/8 hover:text-white ${
             collapsed ? 'justify-center px-0' : ''
           }`}
-          title="Reset session"
+          title="Sign out"
         >
           <LogOut size={17} aria-hidden="true" />
-          {!collapsed ? 'Reset session' : null}
+          {!collapsed ? 'Sign out' : null}
         </button>
       </div>
     </div>
@@ -116,13 +117,22 @@ function SidebarBody({ collapsed, badges, onNavigate, onSignOut }) {
 
 export default function Sidebar() {
   const dispatch = useDispatch()
+  const navigate = useNavigate()
   const collapsed = useSelector(selectSidebarCollapsed)
   const badges = useSelector(selectSidebarBadges)
   const mobileOpen = useSelector((state) => state.ui.mobileNavOpen)
   const location = useLocation()
 
   const closeDrawer = () => dispatch(setMobileNavOpen(false))
-  const signOut = () => dispatch(switchRole(ROLES.CITIZEN))
+  const signOut = async () => {
+    closeDrawer()
+    try {
+      await dispatch(logoutUser()).unwrap()
+      navigate('/login', { replace: true })
+    } catch (error) {
+      dispatch(addToast({ tone: 'danger', title: 'Sign out failed', message: error }))
+    }
+  }
 
   return (
     <>

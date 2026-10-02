@@ -22,7 +22,8 @@ import { markAllRead, markRead } from '../../redux/slices/notificationSlice.js'
 import { selectWeather } from '../../redux/slices/dashboardSlice.js'
 import { selectCurrentUser, selectIsAuthority } from '../../redux/selectors.js'
 import { selectNotifications, selectUnreadCount } from '../../redux/slices/notificationSlice.js'
-import { switchRole } from '../../redux/slices/authSlice.js'
+import { logoutUser } from '../../redux/slices/authSlice.js'
+import { addToast } from '../../redux/slices/uiSlice.js'
 import { useDebounce } from '../../hooks/useDebounce.js'
 import { formatRelativeTime } from '../../utils/formatDate.js'
 import Badge from '../common/Badge.jsx'
@@ -290,6 +291,7 @@ function NotificationBell() {
 
 function ProfileMenu() {
   const dispatch = useDispatch()
+  const navigate = useNavigate()
   const user = useSelector(selectCurrentUser)
   const isAuthority = useSelector(selectIsAuthority)
   const [open, setOpen] = useState(false)
@@ -308,6 +310,16 @@ function ProfileMenu() {
     .map((part) => part.charAt(0))
     .slice(0, 2)
     .join('')
+
+  const signOut = async () => {
+    setOpen(false)
+    try {
+      await dispatch(logoutUser()).unwrap()
+      navigate('/login', { replace: true })
+    } catch (error) {
+      dispatch(addToast({ tone: 'danger', title: 'Sign out failed', message: error }))
+    }
+  }
 
   return (
     <div ref={ref} className="relative">
@@ -356,10 +368,7 @@ function ProfileMenu() {
           <button
             type="button"
             role="menuitem"
-            onClick={() => {
-              dispatch(switchRole('citizen'))
-              setOpen(false)
-            }}
+            onClick={signOut}
             className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-body transition hover:bg-slate-50 hover:text-ink"
           >
             <LogOut size={15} />

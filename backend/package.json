@@ -11,7 +11,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:migrate:prod": "node dist/src/db/migrate.js",
-    "test:api": "tsx scripts/test-auth-api.ts"
+    "test:api": "tsx scripts/test-auth-api.ts",
+    "test:issues": "tsx scripts/test-issue-api.ts"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +21,7 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@imagekit/nodejs": "^7.12.1",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
@@ -28,6 +30,7 @@
     "express-rate-limit": "^8.4.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.4.0",
     "pg": "^8.23.0",
     "zod": "^4.1.13"
   },
@@ -36,9 +39,13 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.3.0",
     "@types/node": "^25.0.3",
     "@types/pg": "^8.15.6",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
+  },
+  "allowScripts": {
+    "esbuild": true
   }
 }

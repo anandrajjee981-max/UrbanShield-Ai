@@ -5,7 +5,7 @@ import { register } from '../../api/auth'
 import { signedIn } from '../../redux/slices/authSlice.js'
 import { ROLE_HOME } from '../../utils/constants.js'
 import Button, { ButtonLink } from '../../components/common/Button'
-import { Info } from 'lucide-react'
+import { Eye, EyeOff, Info } from 'lucide-react'
 
 export default function Register() {
   const navigate = useNavigate()
@@ -14,13 +14,13 @@ export default function Register() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [role, setRole] = useState('citizen')
   const [error, setError] = useState('')
 
   const roles = [
     { value: 'citizen', label: 'Citizen' },
     { value: 'authority', label: 'Authority Officer' },
-    { value: 'admin', label: 'Administrator' },
   ]
 
   const handleSubmit = async (e) => {
@@ -32,7 +32,7 @@ export default function Register() {
       dispatch(signedIn(user))
       navigate(ROLE_HOME[user.role] ?? '/citizen', { replace: true })
     } catch (err) {
-      setError(err.message || 'Registration failed. Please try again.')
+      setError(err.errors?.join('. ') || err.message || 'Registration failed. Please try again.')
     }
   }
 
@@ -45,9 +45,9 @@ export default function Register() {
         </h2>
 
         {error && (
-          <div className="mb-4 p-3 rounded bg-risk-high text-risk-high text-sm">
+          <div role="alert" className="mb-4 rounded-md bg-red-700 p-3 text-sm font-medium text-white shadow-sm">
             <span className="flex items-start">
-              <Info className="flex h-5 w-5 shrink-0 mr-2 text-risk-high align-middle opacity-100" />
+              <Info className="mr-2 flex h-5 w-5 shrink-0 align-middle text-white" />
               <span>{error}</span>
             </span>
           </div>
@@ -77,7 +77,7 @@ export default function Register() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              autocomplete="email"
+              autoComplete="email"
               required
               className="shadow-sm rounded-md border border-navy-300 w-full py-2.5 px-3 text-navy-900 leading-tight focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
             />
@@ -87,20 +87,36 @@ export default function Register() {
             <label htmlFor="password" className="block text-sm font-medium text-navy-600 mb-2">
               Password
             </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autocomplete="new-password"
-              required
-              className="shadow-sm rounded-md border border-navy-300 w-full py-2.5 px-3 text-navy-900 leading-tight focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-            />
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+                required
+                minLength={8}
+                maxLength={72}
+                pattern="(?=.*[A-Za-z])(?=.*[0-9]).{8,72}"
+                title="Use at least 8 characters, including at least one letter and one number."
+                className="shadow-sm rounded-md border border-navy-300 w-full py-2.5 pl-3 pr-11 text-navy-900 leading-tight focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((visible) => !visible)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
+                className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-body transition hover:text-ink"
+              >
+                {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+              </button>
+            </div>
+            <p className="mt-1.5 text-xs text-body">Use at least 8 characters, including one letter and one number.</p>
           </div>
 
           <div>
             <label htmlFor="role" className="block text-sm font-medium text-navy-600 mb-2">
-              Role
+              Account type
             </label>
             <select
               id="role"
@@ -114,6 +130,7 @@ export default function Register() {
                 </option>
               ))}
             </select>
+            <p className="mt-1.5 text-xs text-body">Admin access is assigned by a platform administrator.</p>
           </div>
 
           <Button type="submit" className="w-full">

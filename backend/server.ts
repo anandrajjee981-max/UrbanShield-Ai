@@ -12,6 +12,7 @@ const start = async (): Promise<void> => {
   await verifyDatabaseConnection();
 
   const server = app.listen(env.PORT, () => {
+    // console.log(process.env.DATABASE_URL?.split("@")[1]);
     logger.info('Server listening', { port: env.PORT, environment: env.NODE_ENV });
   });
 

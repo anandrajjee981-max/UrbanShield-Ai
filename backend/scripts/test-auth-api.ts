@@ -46,8 +46,13 @@ const storeCookie = (setCookieHeader: string): void => {
 
   if (!name) return;
 
-  // `Max-Age=0` / `Expires` in the past means the browser drops the cookie.
-  if (/;\s*max-age=0(\D|$)/i.test(setCookieHeader)) {
+  // `Max-Age=0` or an `Expires` date in the past means the browser drops the
+  // cookie. Express's `clearCookie` sends `Expires=Thu, 01 Jan 1970 ...`, so
+  // both forms have to be recognised.
+  const expiresAt = /;\s*expires=([^;]+)/i.exec(setCookieHeader)?.[1];
+  const isExpired = expiresAt !== undefined && Number.isFinite(Date.parse(expiresAt)) && Date.parse(expiresAt) <= Date.now();
+
+  if (/;\s*max-age=0(\D|$)/i.test(setCookieHeader) || isExpired) {
     cookieJar = cookieJar
       .split('; ')
       .filter((entry) => entry.split('=')[0] !== name)

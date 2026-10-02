@@ -65,7 +65,7 @@ export default function AppShell({ children }) {
             </span>
           </div>
 
-          <main className="flex-1 pb-24 lg:pb-8">{children ?? <Outlet />}</main>
+          <main className="flex-1 px-4 pt-4 pb-24 sm:px-6 lg:px-0 lg:pt-0 lg:pb-8">{children ?? <Outlet />}</main>
 
           <footer className="hidden border-t border-line px-6 py-4 text-[11px] text-muted lg:block">
             UbranShieldAI · AI-Powered Urban Risk &amp; Civic Intelligence Platform

@@ -13,11 +13,12 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_A
 
 /** Error carrying the `{ success: false, message, code }` envelope from the API. */
 export class ApiError extends Error {
-  constructor(message, status, code) {
+  constructor(message, status, code, errors = []) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
+    this.errors = errors
   }
 }
 
@@ -37,6 +38,7 @@ const request = async (path, { method = 'GET', body } = {}) => {
       payload?.message ?? 'Request failed',
       response.status,
       payload?.code ?? 'UNKNOWN_ERROR',
+      Array.isArray(payload?.errors) ? payload.errors : [],
     )
   }
 

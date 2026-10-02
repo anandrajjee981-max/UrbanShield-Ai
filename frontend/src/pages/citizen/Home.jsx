@@ -48,8 +48,8 @@ export default function Home() {
         title={`Hello, ${user?.name?.split(' ')[0] ?? 'neighbour'}`}
         subtitle="Here is what is happening in your city, and where your own reports stand."
         actions={
-          <ButtonLink to="/citizen/report" variant="primary" size="md" icon={Siren}>
-            Report an issue
+          <ButtonLink to="/citizen/live-report" variant="primary" size="md" icon={Siren}>
+            Live report
           </ButtonLink>
         }
       />

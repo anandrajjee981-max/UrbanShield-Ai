@@ -16,6 +16,11 @@ export default function LocationPicker({ value, onChange, error }) {
     onChange(coords)
   }
 
+  async function useDeviceLocation() {
+    const nextPosition = await locate()
+    if (nextPosition) onChange(nextPosition)
+  }
+
   return (
     <div className="space-y-3">
       <div className="relative overflow-hidden rounded-xl border border-line">
@@ -72,7 +77,7 @@ export default function LocationPicker({ value, onChange, error }) {
           {error ? <p className="mt-1 text-[11px] font-medium text-risk-high">{error}</p> : null}
         </div>
 
-        <Button variant="secondary" size="sm" icon={Navigation} loading={isLocating} onClick={locate}>
+        <Button variant="secondary" size="sm" icon={Navigation} loading={isLocating} onClick={useDeviceLocation}>
           Use my location
         </Button>
       </div>
