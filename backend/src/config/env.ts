@@ -52,6 +52,23 @@ const envSchema = z.object({
     .min(1, 'IMAGEKIT_PRIVATE_KEY is required')
     .startsWith('private_', 'IMAGEKIT_PRIVATE_KEY must start with "private_"'),
 
+  IMAGEKIT_URL_ENDPOINT: z
+    .string()
+    .min(1, 'IMAGEKIT_URL_ENDPOINT is required')
+    .url('IMAGEKIT_URL_ENDPOINT must be a valid URL')
+    .refine(
+      (value) => {
+        try {
+          const hostname = new URL(value).hostname;
+          return hostname.includes('imagekit.io');
+        } catch {
+          return false;
+        }
+      },
+      'IMAGEKIT_URL_ENDPOINT must point to an ImageKit domain',
+    )
+    .transform((value) => value.replace(/\/$/, '')),
+
   /** Upper bound for a single issue photo, enforced before any upload starts. */
   ISSUE_IMAGE_MAX_BYTES: z.coerce.number().int().positive().default(5 * 1024 * 1024),
 

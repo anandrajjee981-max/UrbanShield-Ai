@@ -1,233 +1,96 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
-/*
- * Single source of truth for every colour in the product.
- * Components must never hardcode a hex value - they consume these tokens
- * either as Tailwind utilities (`bg-brand-500`, `text-risk-high`) or through
- * `utils/colors.js` when a chart / Leaflet option needs a raw value.
- */
-@theme {
-  --font-sans: 'Outfit', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+@custom-variant dark (&:where(.dark, .dark *));
 
-  /* Brand - primary green */
-  --color-brand-50: #ecfdf5;
-  --color-brand-100: #d1fae5;
-  --color-brand-200: #a7f3d0;
-  --color-brand-300: #6ee7b7;
-  --color-brand-400: #34d399;
-  --color-brand-500: #10b981;
-  --color-brand-600: #059669;
-  --color-brand-700: #047857;
-  --color-brand-800: #065f46;
-  --color-brand-900: #064e3b;
+:root {
+  --civic-primary: #f84424;
+  --civic-primary-warm: #f36d24;
+  --civic-blue: #4482ea;
+  --civic-green: #51933a;
+  --civic-amber: #f7b907;
+  --civic-amber-dark: #965d13;
+  --civic-orange-soft: #fb9c47;
+  --civic-text-dark: #483f25;
+  --civic-bg-canvas: #fcf9f2;
+  --civic-bg-cream: #fff8f0;
+  --civic-border-dim: #e8d9b5;
+  --civic-surface-card: #ffffff;
 
-  /* Navy - sidebar + authority surfaces */
-  --color-navy-700: #062a3a;
-  --color-navy-800: #083b4d;
-  --color-navy-900: #0b2f3f;
-
-  /* Neutrals */
-  --color-surface: #f5f9fc;
-  --color-line: #e2e8f0;
-  --color-ink: #0f172a;
-  --color-body: #64748b;
-  --color-muted: #94a3b8;
-
-  /* Risk severity */
-  --color-risk-high: #ef4444;
-  --color-risk-medium: #f59e0b;
-  --color-risk-low: #22c55e;
-  --color-risk-minimal: #10b981;
-
-  /* Risk category */
-  --color-risk-water: #3b82f6;
-  --color-risk-heat: #ef4444;
-  --color-risk-garbage: #10b981;
-  --color-risk-road: #f59e0b;
-  --color-risk-infrastructure: #8b5cf6;
-  --color-risk-environment: #14b8a6;
-  --color-risk-ai: #7c3aed;
-
-  /* Elevation */
-  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.06);
-  --shadow-raised: 0 4px 6px -1px rgb(15 23 42 / 0.07), 0 2px 4px -2px rgb(15 23 42 / 0.05);
-  --shadow-pop: 0 10px 15px -3px rgb(15 23 42 / 0.1), 0 4px 6px -4px rgb(15 23 42 / 0.1);
-
-  --animate-fade-in: fade-in 0.25s ease-out;
-  --animate-slide-in: slide-in 0.2s ease-out;
-  --animate-shimmer: shimmer 1.6s infinite;
+  color-scheme: light;
+  --canvas: #fcf9f2;
+  --cream: #fff8f0;
+  --card: #ffffff;
+  --ink: #483f25;
+  --soft: #6f6449;
+  --mute: #8a7f63;
+  --line: #e8d9b5;
+  --panel: #483f25;
+  --brand: #f84424;
+  --brand-warm: #f36d24;
+  --brand-soft: #fff1e6;
+  --blue: #4482ea;
+  --green: #51933a;
+  --amber: #f7b907;
+  --amberdark: #965d13;
+  --tag: #fb9c47;
+  --grid: #e8d9b5;
 }
 
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
+.dark {
+  color-scheme: dark;
+  --canvas: #16110a;
+  --cream: #201910;
+  --card: #2a2114;
+  --ink: #f2e7cf;
+  --soft: #c9b992;
+  --mute: #9c8f6e;
+  --line: #4c3f27;
+  --panel: #453823;
+  --brand: #ff5f3d;
+  --brand-warm: #ff8a3d;
+  --brand-soft: #3a2312;
+  --blue: #6f9ff2;
+  --green: #6fae52;
+  --amber: #f7b907;
+  --amberdark: #d29a3a;
+  --tag: #fb9c47;
+  --grid: #4c3f27;
 }
 
-@keyframes slide-in {
-  from {
-    opacity: 0;
-    transform: translateX(12px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-cream: var(--cream);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-soft: var(--soft);
+  --color-mute: var(--mute);
+  --color-line: var(--line);
+  --color-panel: var(--panel);
+  --color-brand: var(--brand);
+  --color-brand-warm: var(--brand-warm);
+  --color-brand-soft: var(--brand-soft);
+  --color-civic-blue: var(--blue);
+  --color-civic-green: var(--green);
+  --color-civic-amber: var(--amber);
+  --color-civic-amber-dark: var(--amberdark);
+  --color-tag: var(--tag);
+  /* legacy aliases */
+  --color-primary: var(--brand);
+  --color-primary-hover: var(--brand-warm);
+  --color-primary-light: var(--brand-soft);
+  --color-bg: var(--canvas);
+  --color-border: var(--line);
+  --color-ai: var(--amberdark);
+  --color-ai-light: var(--cream);
 }
 
-@keyframes shimmer {
-  100% {
-    transform: translateX(100%);
-  }
-}
+html, body, #root { height: 100%; }
+body { margin: 0; background: var(--canvas); color: var(--ink); font-family: ui-sans-serif, system-ui, sans-serif; }
+.leaflet-container { z-index: 0; font-family: inherit; }
 
-@layer base {
-  html {
-    -webkit-text-size-adjust: 100%;
-  }
-
-  body {
-    margin: 0;
-    background-color: var(--color-surface);
-    color: var(--color-ink);
-    -webkit-font-smoothing: antialiased;
-  }
-
-  *:focus-visible {
-    outline: 2px solid var(--color-brand-500);
-    outline-offset: 2px;
-  }
-
-  ::selection {
-    background-color: var(--color-brand-200);
-    color: var(--color-navy-900);
-  }
-}
-
-@layer components {
-  /* White card - the workhorse surface of the whole product. */
-  .card {
-    min-width: 0;
-    background-color: #ffffff;
-    border: 1px solid var(--color-line);
-    border-radius: 0.875rem;
-    box-shadow: var(--shadow-card);
-  }
-
-  .card-interactive {
-    transition:
-      box-shadow 0.2s ease,
-      transform 0.2s ease,
-      border-color 0.2s ease;
-  }
-
-  .card-interactive:hover {
-    box-shadow: var(--shadow-raised);
-    border-color: var(--color-brand-200);
-    transform: translateY(-2px);
-  }
-
-  /* Shimmering placeholder used while API data is in flight. */
-  .skeleton {
-    position: relative;
-    overflow: hidden;
-    background-color: #eef2f6;
-    border-radius: 0.5rem;
-  }
-
-  .skeleton::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    transform: translateX(-100%);
-    background-image: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.65), transparent);
-    animation: var(--animate-shimmer);
-  }
-
-  /* Leaflet renders its own z-index scale; pin the map below app chrome. */
-  .leaflet-container {
-    z-index: 0;
-    font-family: var(--font-sans);
-    background-color: #e8eef4;
-  }
-
-  .leaflet-popup-content-wrapper {
-    border-radius: 0.75rem;
-    box-shadow: var(--shadow-pop);
-  }
-
-  /*
-   * Form controls. One definition for inputs, selects and textareas so a form
-   * in the reporting flow looks identical to a filter control on the dashboard.
-   */
-  .input {
-    width: 100%;
-    border-radius: 0.625rem;
-    border: 1px solid var(--color-line);
-    background-color: #ffffff;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.875rem;
-    color: var(--color-ink);
-    transition:
-      border-color 0.15s ease,
-      box-shadow 0.15s ease;
-  }
-
-  .input::placeholder {
-    color: var(--color-muted);
-  }
-
-  .input:hover {
-    border-color: #cbd5e1;
-  }
-
-  .input:focus {
-    outline: none;
-    border-color: var(--color-brand-500);
-    box-shadow: 0 0 0 3px rgb(16 185 129 / 0.15);
-  }
-
-  .input[aria-invalid='true'] {
-    border-color: var(--color-risk-high);
-  }
-
-  select.input {
-    appearance: none;
-    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%2364748b'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 0.5rem center;
-    background-size: 1.15em;
-    padding-right: 2rem;
-  }
-
-  /* The scrollable body of a modal and a drawer share this treatment. */
-  .scroll-area {
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-}
-
-/* Thin, unobtrusive scrollbars. */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
-  border-radius: 9999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background-color: #94a3b8;
-}
+/* Dark-mode tuning for third-party surfaces */
+.dark .leaflet-tile-pane { filter: brightness(0.85) saturate(0.9); }
+.dark .leaflet-popup-content-wrapper,
+.dark .leaflet-popup-tip { background: #2a2114; color: #f2e7cf; }
+.dark .recharts-default-tooltip { background: #2a2114 !important; border: 1px solid #4c3f27 !important; }
+.dark .recharts-tooltip-label { color: #f2e7cf !important; }

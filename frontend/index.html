@@ -4,15 +4,17 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0B1B2B" />
-    <meta
-      name="description"
-      content="UbranShieldAI - AI-Powered Urban Risk & Civic Intelligence Platform. Smarter Cities. Safer Communities. Resilient Tomorrow."
-    />
-    <title>UbranShieldAI - AI-Powered Urban Risk &amp; Civic Intelligence Platform</title>
+    <title>UrbanShieldAI — City Resilience Frontend</title>
+    <script>
+      try {
+        var t = localStorage.getItem('urbanshield_theme');
+        if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches))
+          document.documentElement.classList.add('dark');
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

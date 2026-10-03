@@ -29,6 +29,13 @@ export const ISSUE_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] 
 export const ISSUE_IMAGE_MAX_BYTES = env.ISSUE_IMAGE_MAX_BYTES;
 
 /**
+ * The URL endpoint belongs to the URL-building helper, not the client options in
+ * ImageKit v7. Keep it in one place so the app can build signed or transformed
+ * asset URLs when needed.
+ */
+export const IMAGEKIT_URL_ENDPOINT = env.IMAGEKIT_URL_ENDPOINT;
+
+/**
  * Shared ImageKit client. Uploads fail fast instead of retrying for a long time:
  * a citizen is waiting on the response, and a retry of a large body would only
  * hold the connection open longer.
