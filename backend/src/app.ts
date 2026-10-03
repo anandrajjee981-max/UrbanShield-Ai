@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import { env, FRONTEND_ORIGINS } from './config/env.js';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware.js';
 import authRoutes from './routes/auth.routes.js';
+import adminIssueRoutes from './routes/admin-issue.routes.js';
 import issueRoutes from './routes/issue.routes.js';
 import { sendSuccess } from './utils/api-response.js';
 import { logger } from './utils/logger.js';
@@ -62,8 +63,10 @@ export const createApp = (): Express => {
     sendSuccess(res, 200, 'Service is healthy', { status: 'ok', environment: env.NODE_ENV });
   });
 
-  app.use('/api/auth', authRoutes);//
+  app.use('/api/auth', authRoutes);
   app.use('/api/issues', issueRoutes);
+  // Admin review of citizen reports: /api/admin/issues[/:issueId[/verify|/reject]]
+  app.use('/api/admin/issues', adminIssueRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

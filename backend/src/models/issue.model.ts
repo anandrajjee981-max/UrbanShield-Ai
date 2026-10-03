@@ -17,8 +17,26 @@ export interface IssueRow {
   longitude: string | null;
   address: string | null;
   status: IssueStatus;
+  /** Admin review metadata (003_add_issue_verification.sql). */
+  verified_by: string | null;
+  verified_at: Date | null;
+  rejected_by: string | null;
+  rejected_at: Date | null;
+  rejection_reason: string | null;
   created_at: Date;
   updated_at: Date;
+}
+
+/**
+ * An `issues` row joined to the citizen who reported it, as the admin review
+ * screen reads it.
+ *
+ * Only `name` and `email` are selected from `users`, so `password_hash` can
+ * never reach this shape even by accident.
+ */
+export interface AdminIssueRow extends IssueRow {
+  citizen_name: string;
+  citizen_email: string;
 }
 
 /** Domain entity passed between DAO, service and controller. */
@@ -34,6 +52,11 @@ export interface Issue {
   longitude: number | null;
   address: string | null;
   status: IssueStatus;
+  verifiedBy: string | null;
+  verifiedAt: Date | null;
+  rejectedBy: string | null;
+  rejectedAt: Date | null;
+  rejectionReason: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -87,6 +110,42 @@ export interface UploadedImageFile {
   size: number;
 }
 
+/**
+ * The issue shape the admin review screen receives.
+ *
+ * It is deliberately a standalone interface rather than `Issue & { citizen }`:
+ * that would carry `userId` and `imageFileId` into the response, and an admin
+ * payload must only contain what the review actually needs - the report, the
+ * location, the review metadata and who reported it.
+ *
+ * The citizen's identity comes from the `users` join performed in the DAO, and
+ * the reviewer's identity is a user id only: the admin's name and email are
+ * resolved through the same relationship instead of being copied into
+ * `issues`.
+ */
+export interface AdminIssue {
+  id: string;
+  issueType: IssueType;
+  description: string;
+  imageUrl: string | null;
+  locationType: LocationType;
+  latitude: number | null;
+  longitude: number | null;
+  address: string | null;
+  status: IssueStatus;
+  citizen: {
+    name: string;
+    email: string;
+  };
+  verifiedBy: string | null;
+  verifiedAt: Date | null;
+  rejectedBy: string | null;
+  rejectedAt: Date | null;
+  rejectionReason: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 /** Maps a raw database row to the domain entity. */
 export const toIssue = (row: IssueRow): Issue => ({
   id: row.id,
@@ -100,6 +159,35 @@ export const toIssue = (row: IssueRow): Issue => ({
   longitude: row.longitude === null ? null : Number(row.longitude),
   address: row.address,
   status: row.status,
+  verifiedBy: row.verified_by,
+  verifiedAt: row.verified_at,
+  rejectedBy: row.rejected_by,
+  rejectedAt: row.rejected_at,
+  rejectionReason: row.rejection_reason,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+/** Maps a row that also carries the joined citizen columns. */
+export const toAdminIssue = (row: AdminIssueRow): AdminIssue => ({
+  id: row.id,
+  issueType: row.issue_type,
+  description: row.description,
+  imageUrl: row.image_url,
+  locationType: row.location_type,
+  latitude: row.latitude === null ? null : Number(row.latitude),
+  longitude: row.longitude === null ? null : Number(row.longitude),
+  address: row.address,
+  status: row.status,
+  citizen: {
+    name: row.citizen_name,
+    email: row.citizen_email,
+  },
+  verifiedBy: row.verified_by,
+  verifiedAt: row.verified_at,
+  rejectedBy: row.rejected_by,
+  rejectedAt: row.rejected_at,
+  rejectionReason: row.rejection_reason,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });

@@ -12,7 +12,8 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:migrate:prod": "node dist/src/db/migrate.js",
     "test:api": "tsx scripts/test-auth-api.ts",
-    "test:issues": "tsx scripts/test-issue-api.ts"
+    "test:issues": "tsx scripts/test-issue-api.ts",
+    "test:admin": "tsx scripts/test-admin-issue-api.ts"
   },
   "keywords": [],
   "author": "",
