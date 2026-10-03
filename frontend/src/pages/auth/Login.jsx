@@ -4,7 +4,7 @@ import { useDispatch } from 'react-redux'
 import { login } from '../../api/auth'
 import { signedIn } from '../../redux/slices/authSlice.js'
 import { ROLE_HOME } from '../../utils/constants.js'
-import Button, { ButtonLink } from '../../components/common/Button'
+import Button from '../../components/common/Button'
 import { Eye, EyeOff, Info } from 'lucide-react'
 
 export default function Login() {
@@ -25,7 +25,7 @@ export default function Login() {
     try {
       const user = await login({ email, password })
       dispatch(signedIn(user))
-      navigate(ROLE_HOME[user.role] ?? '/citizen', { replace: true })
+      navigate(ROLE_HOME[user.role] ?? '/403', { replace: true })
     } catch (err) {
       setError(err.message || 'Login failed. Please check your credentials.')
     } finally {
@@ -96,11 +96,6 @@ export default function Login() {
             {isLoading ? 'Signing in...' : 'Sign in'}
           </Button>
 
-          <div className="text-center text-sm">
-            <ButtonLink to="/citizen" variant="ghost" size="sm">
-              Continue as guest
-            </ButtonLink>
-          </div>
         </form>
       </div>
     </div>

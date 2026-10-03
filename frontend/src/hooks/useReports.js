@@ -12,6 +12,7 @@ import {
   setFilters as setReportFilters,
   setPage,
   submitReport,
+  deleteReport as deleteReportThunk,
 } from '../redux/slices/reportSlice.js'
 import { addToast } from '../redux/slices/uiSlice.js'
 import { selectCurrentUser, selectIsAuthority } from '../redux/selectors.js'
@@ -134,7 +135,7 @@ export function useReports({ scope = 'all', limit = 10, auto = true } = {}) {
     [dispatch, user],
   )
 
-  const reject = useCallback(
+const reject = useCallback(
     async (id, reason) => {
       const result = await dispatch(rejectReport({ id, reason }))
       dispatch(
@@ -142,7 +143,22 @@ export function useReports({ scope = 'all', limit = 10, auto = true } = {}) {
           result.status === 'fulfilled'
             ? { tone: 'success', title: 'Report rejected' }
             : { tone: 'danger', title: 'Could not reject', message: result.payload },
-        ),
+        )
+      )
+      return result
+    },
+    [dispatch],
+  )
+
+  const deleteReport = useCallback(
+    async (id) => {
+      const result = await dispatch(deleteReportThunk({ id }))
+      dispatch(
+        addToast(
+          result.status === 'fulfilled'
+            ? { tone: 'success', title: 'Report deleted' }
+            : { tone: 'danger', title: 'Could not delete', message: result.payload },
+        )
       )
       return result
     },
@@ -167,6 +183,7 @@ export function useReports({ scope = 'all', limit = 10, auto = true } = {}) {
     assign,
     note,
     reject,
+    deleteReport,
   }
 }
 

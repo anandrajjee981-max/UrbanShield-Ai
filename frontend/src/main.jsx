@@ -12,14 +12,15 @@ import { attachRealtimeListeners } from './redux/realtime.js'
 /**
  * Entry point.
  *
- * The shell renders first with the preloaded demo identity, then bootstrap
- * confirms the real session and attaches realtime listeners. Doing it in this
- * order keeps first paint instant while still having the guards run against a
- * settled user a tick later.
+ * The shell renders in its authentication-checking state while bootstrap
+ * confirms the cookie session, then loads protected data and realtime updates.
  */
 
 const bootstrap = async () => {
   await store.dispatch(loadSession())
+
+  if (store.getState().auth.status !== 'authenticated') return
+
   await store.dispatch(loadNotifications())
 
   const detach = attachRealtimeListeners(store)

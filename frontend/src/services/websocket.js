@@ -11,7 +11,7 @@ import { SOCKET_EVENTS } from '../utils/constants.js'
  */
 
 const SOCKET_URL = import.meta.env.VITE_WS_URL ?? import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000'
-const USE_MOCK_SOCKET = import.meta.env.VITE_USE_MOCK !== 'false'
+const USE_MOCK_SOCKET = import.meta.env.VITE_USE_MOCK === 'true'
 
 /** In-process event emitter shared by the mock and real transports. */
 function createEmitter() {

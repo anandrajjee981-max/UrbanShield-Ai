@@ -19,7 +19,7 @@ import { addToast } from '../../redux/slices/uiSlice.js'
  */
 export default function MyReports() {
   const dispatch = useDispatch()
-  const { reports, filters, loading, error, setFilters, clearFilters, refetch } = useReports({ scope: 'mine', limit: 50 })
+  const { reports, filters, loading, error, setFilters, clearFilters, refetch, pagination, setPage, deleteReport } = useReports({ scope: 'mine', limit: 50 })
 
   useEffect(() => {
     document.title = 'My Reports · UbranShieldAI'
@@ -76,6 +76,19 @@ export default function MyReports() {
         <ReportTable
           reports={reports}
           loading={loading}
+          error={error}
+          onRetry={() => refetch()}
+          pagination={pagination}
+          onPageChange={setPage}
+          authority={false}
+          onDelete={(id) => {
+            dispatch(deleteReport(id))
+              .then(() => refetch())
+              .catch((err) => {
+                console.error(err)
+                dispatch(addToast({ tone: 'danger', title: 'Delete failed', message: 'Could not delete report.' }))
+              })
+          }}
           filters={filters}
           onFilterChange={setFilters}
           onClearFilters={clearFilters}

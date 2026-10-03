@@ -11,10 +11,10 @@ import axios from 'axios'
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000'
 
 /**
- * The app runs fully on the mock layer until `VITE_USE_MOCK=false` is set.
- * Individual API modules check `USE_MOCK` and fall back to their mock builder.
+ * The mock layer is opt-in for local demos with `VITE_USE_MOCK=true`.
+ * Normal startup uses the backend session and API.
  */
-export const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
+export const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
 export const http = axios.create({
   baseURL: API_BASE_URL,

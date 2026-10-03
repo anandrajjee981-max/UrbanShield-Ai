@@ -12,5 +12,5 @@ import { ROLE_HOME } from '../utils/constants.js'
  */
 export default function RoleHome() {
   const role = useSelector(selectRole)
-  return <Navigate to={ROLE_HOME[role] ?? '/citizen'} replace />
+  return <Navigate to={ROLE_HOME[role] ?? '/403'} replace />
 }

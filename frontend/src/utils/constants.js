@@ -1,26 +1,17 @@
 import {
   BarChart3,
-  Bot,
-  Building2,
-  CheckSquare,
   ClipboardList,
+  CircleCheck,
+  CircleX,
   FileText,
-  Gauge,
-  HelpCircle,
   Home,
-  Info,
-  Landmark,
   Layers,
   LayoutDashboard,
-  ListChecks,
-  Map,
   MapPin,
-  MessageSquare,
   Settings,
   ShieldCheck,
-  Siren,
   UserCog,
-  Users,
+  UserRound,
 } from 'lucide-react'
 
 /** Product identity. */
@@ -156,11 +147,11 @@ export const ROLE_LABELS = {
   admin: 'Administrator',
 }
 
-/** Base path for each role, used by the role switcher and route guards. */
+/** Base path for each authenticated role, used by login and route guards. */
 export const ROLE_HOME = {
-  citizen: '/citizen',
+  citizen: '/citizen/dashboard',
   authority: '/authority/dashboard',
-  admin: '/authority/dashboard',
+  admin: '/admin/dashboard',
 }
 
 /**
@@ -169,41 +160,37 @@ export const ROLE_HOME = {
  */
 export const NAV_MENUS = {
   authority: [
-    { label: 'Dashboard', to: '/authority/dashboard', icon: LayoutDashboard, roles: [ROLES.AUTHORITY, ROLES.ADMIN] },
-    { label: 'City Map', to: '/authority/map', icon: Map, roles: [ROLES.AUTHORITY, ROLES.ADMIN] },
-    { label: 'Reports', to: '/authority/reports', icon: FileText, badgeKey: 'pendingVerification', roles: [ROLES.AUTHORITY, ROLES.ADMIN] },
-    { label: 'Verification', to: '/authority/verification', icon: CheckSquare, badgeKey: 'pendingVerification', roles: [ROLES.AUTHORITY, ROLES.ADMIN] },
-    { label: 'Assignments', to: '/authority/assignments', icon: ClipboardList, badgeKey: 'activeAssignments', roles: [ROLES.AUTHORITY, ROLES.ADMIN] },
-    { label: 'Departments', to: '/authority/departments', icon: Building2, roles: [ROLES.AUTHORITY, ROLES.ADMIN] },
-    { label: 'Analytics & Insights', to: '/authority/analytics', icon: BarChart3, roles: [ROLES.AUTHORITY, ROLES.ADMIN] },
-    { label: 'AI Assistant', to: '/authority/ai', icon: Bot, roles: [ROLES.AUTHORITY, ROLES.ADMIN] },
-    { label: 'Settings', to: '/authority/settings', icon: Settings, roles: [ROLES.AUTHORITY, ROLES.ADMIN] },
-    { label: 'User Management', to: '/authority/users', icon: Users, roles: [ROLES.ADMIN] },
+    { label: 'Dashboard', to: '/authority/dashboard', icon: LayoutDashboard, roles: [ROLES.AUTHORITY] },
+    { label: 'Assigned Tasks', to: '/authority/tasks', icon: ClipboardList, roles: [ROLES.AUTHORITY] },
+    { label: 'Profile', to: '/authority/profile', icon: UserRound, roles: [ROLES.AUTHORITY] },
+  ],
+  admin: [
+    { label: 'Dashboard', to: '/admin/dashboard', icon: LayoutDashboard, roles: [ROLES.ADMIN] },
+    { label: 'Reports', to: '/admin/issues', icon: FileText, roles: [ROLES.ADMIN] },
+    { label: 'Verified Reports', to: '/admin/issues?status=VERIFIED', icon: CircleCheck, roles: [ROLES.ADMIN] },
+    { label: 'Rejected Reports', to: '/admin/issues?status=REJECTED', icon: CircleX, roles: [ROLES.ADMIN] },
+    { label: 'Profile', to: '/admin/profile', icon: UserRound, roles: [ROLES.ADMIN] },
   ],
   citizen: [
-    { label: 'Home', to: '/citizen', icon: Home, roles: [ROLES.CITIZEN] },
-    { label: 'City Map', to: '/citizen/map', icon: Map, roles: [ROLES.CITIZEN] },
-    { label: 'Live Report', to: '/citizen/live-report', icon: Siren, roles: [ROLES.CITIZEN] },
-    { label: 'Full Report Form', to: '/citizen/report', icon: FileText, roles: [ROLES.CITIZEN] },
-    { label: 'My Reports', to: '/citizen/reports', icon: ListChecks, roles: [ROLES.CITIZEN] },
-    { label: 'Notifications', to: '/citizen/notifications', icon: MessageSquare, badgeKey: 'unreadNotifications', roles: [ROLES.CITIZEN] },
-    { label: 'Analytics', to: '/citizen/analytics', icon: BarChart3, roles: [ROLES.CITIZEN] },
-    { label: 'How It Works', to: '/citizen/how-it-works', icon: HelpCircle, roles: [ROLES.CITIZEN] },
-    { label: 'About', to: '/about', icon: Info, roles: [ROLES.CITIZEN, ROLES.AUTHORITY, ROLES.ADMIN] },
+    { label: 'Dashboard', to: '/citizen/dashboard', icon: LayoutDashboard, roles: [ROLES.CITIZEN] },
+    { label: 'Report an Issue', to: '/citizen/report', icon: FileText, roles: [ROLES.CITIZEN] },
+    { label: 'My Reports', to: '/citizen/reports', icon: ClipboardList, roles: [ROLES.CITIZEN] },
+    { label: 'Profile', to: '/citizen/profile', icon: UserRound, roles: [ROLES.CITIZEN] },
   ],
 }
 
 /** Bottom tab bar on mobile. */
 export const MOBILE_NAV_ITEMS = [
-  { label: 'Home', to: '/citizen', icon: Home, roles: [ROLES.CITIZEN] },
-  { label: 'Map', to: '/citizen/map', icon: Map, roles: [ROLES.CITIZEN] },
-  { label: 'Report', to: '/citizen/live-report', icon: Siren, roles: [ROLES.CITIZEN], primary: true },
-  { label: 'Reports', to: '/citizen/reports', icon: FileText, roles: [ROLES.CITIZEN] },
-  { label: 'Alerts', to: '/citizen/notifications', icon: MessageSquare, roles: [ROLES.CITIZEN] },
-  { label: 'Dashboard', to: '/authority/dashboard', icon: Gauge, roles: [ROLES.AUTHORITY, ROLES.ADMIN] },
-  { label: 'Reports', to: '/authority/reports', icon: FileText, roles: [ROLES.AUTHORITY, ROLES.ADMIN] },
-  { label: 'Analytics', to: '/authority/analytics', icon: BarChart3, roles: [ROLES.AUTHORITY, ROLES.ADMIN] },
-  { label: 'More', to: '/authority/departments', icon: Landmark, roles: [ROLES.AUTHORITY, ROLES.ADMIN] },
+  { label: 'Dashboard', to: '/citizen/dashboard', icon: LayoutDashboard, roles: [ROLES.CITIZEN] },
+  { label: 'Report', to: '/citizen/report', icon: FileText, roles: [ROLES.CITIZEN], primary: true },
+  { label: 'Reports', to: '/citizen/reports', icon: ClipboardList, roles: [ROLES.CITIZEN] },
+  { label: 'Profile', to: '/citizen/profile', icon: UserRound, roles: [ROLES.CITIZEN] },
+  { label: 'Dashboard', to: '/authority/dashboard', icon: LayoutDashboard, roles: [ROLES.AUTHORITY] },
+  { label: 'Tasks', to: '/authority/tasks', icon: ClipboardList, roles: [ROLES.AUTHORITY] },
+  { label: 'Profile', to: '/authority/profile', icon: UserRound, roles: [ROLES.AUTHORITY] },
+  { label: 'Dashboard', to: '/admin/dashboard', icon: LayoutDashboard, roles: [ROLES.ADMIN] },
+  { label: 'Reports', to: '/admin/issues', icon: FileText, roles: [ROLES.ADMIN] },
+  { label: 'Profile', to: '/admin/profile', icon: UserRound, roles: [ROLES.ADMIN] },
 ]
 
 /** Infrastructure POI categories shown on the map. */

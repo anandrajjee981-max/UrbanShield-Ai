@@ -39,6 +39,7 @@ export default function ReportTable({
   emptyTitle = 'No reports found',
   emptyMessage = 'Adjust your filters or try a different date range.',
   columns = ['report', 'issue', 'ward', 'status', 'priority', 'department', 'updated', 'actions'],
+  onDelete,
 }) {
   const [openMenu, setOpenMenu] = useState(null)
 
@@ -207,6 +208,15 @@ export default function ReportTable({
                         >
                           Copy tracking ID
                         </button>
+                        {authority && (
+                          <button
+                            type="button"
+                            onClick={() => onDelete?.(report.id)}
+                            className="block w-full px-3.5 py-2 text-left text-xs text-red-600 font-medium transition hover:bg-red-100"
+                          >
+                            Delete
+                          </button>
+                        )}
                       </div>
                     ) : null}
                   </td>
