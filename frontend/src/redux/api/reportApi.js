@@ -68,10 +68,10 @@ function createMockReport(payload, user) {
     status: 'reported',
     priority: payload.priority ?? 'medium',
     reporter: {
-      id: user.id,
+      id: payload.anonymous ? null : user.id,
       name: payload.anonymous ? 'Anonymous resident' : user.name,
-      phone: payload.contactPhone ?? user.phone ?? '',
-      email: payload.contactEmail ?? user.email ?? '',
+      phone: payload.anonymous ? '' : payload.contactPhone ?? user.phone ?? '',
+      email: payload.anonymous ? '' : payload.contactEmail ?? user.email ?? '',
       anonymous: Boolean(payload.anonymous),
     },
     department: null,
@@ -197,6 +197,22 @@ export async function rejectReport(id, reason) {
 
   store[index] = {
     ...pushStatus(store[index], 'rejected', 'Authority Officer', reason || 'Report did not match any known issue.'),
+  }
+  writeMockStore(store)
+  return store[index]
+}
+
+/** `PATCH`-style soft deletion of a report. */
+export async function deleteReport(id) {
+  if (!USE_MOCK) return patch(`/api/reports/${id}/delete`, {})
+
+  await fakeLatency(260, 480)
+  const store = readMockStore()
+  const index = store.findIndex((report) => report.id === id)
+  if (index === -1) throw new Error('Report not found')
+
+  store[index] = {
+    ...pushStatus(store[index], 'deleted', 'Authority Officer', 'Report deleted.'),
   }
   writeMockStore(store)
   return store[index]

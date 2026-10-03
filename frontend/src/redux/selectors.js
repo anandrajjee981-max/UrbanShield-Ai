@@ -13,8 +13,8 @@ const selectAuthStatus = (state) => state.auth.status
 const selectGlobalFilters = (state) => state.ui.filters
 
 export const selectCurrentUser = selectUser
-export const selectIsAuthenticated = createSelector([selectAuthStatus], (status) => status === 'authenticated' || status === 'idle')
-export const selectRole = createSelector([selectUser], (user) => user?.role ?? ROLES.CITIZEN)
+export const selectIsAuthenticated = createSelector([selectAuthStatus], (status) => status === 'authenticated')
+export const selectRole = createSelector([selectUser], (user) => user?.role ?? null)
 export const selectIsAuthority = createSelector([selectRole], (role) => role === ROLES.AUTHORITY || role === ROLES.ADMIN)
 export const selectIsAdmin = createSelector([selectRole], (role) => role === ROLES.ADMIN)
 

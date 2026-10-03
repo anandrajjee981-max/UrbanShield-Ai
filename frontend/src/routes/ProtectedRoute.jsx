@@ -5,19 +5,25 @@ import { ROLE_HOME, ROLE_LABELS } from '../utils/constants.js'
 import { selectIsAuthenticated, selectRole } from '../redux/selectors.js'
 import Button from '../components/common/Button.jsx'
 import { Link } from 'react-router-dom'
+import { PageLoader } from '../components/common/Loader.jsx'
 
 /**
  * Gate for every signed-in route.
  *
- * A visitor without a session is sent to the public landing page, with the
+ * A visitor without a session is sent to login, with the
  * attempted path in router state so login can return them to it.
  */
 export default function ProtectedRoute() {
   const isAuthenticated = useSelector(selectIsAuthenticated)
+  const authStatus = useSelector((state) => state.auth.status)
   const location = useLocation()
 
+  if (authStatus === 'loading' || authStatus === 'idle') {
+    return <PageLoader label="Checking authentication..." />
+  }
+
   if (!isAuthenticated) {
-    return <Navigate to="/" replace state={{ from: location.pathname }} />
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
 
   return <Outlet />

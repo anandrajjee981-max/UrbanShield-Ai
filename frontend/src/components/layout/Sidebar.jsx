@@ -1,7 +1,7 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { ChevronLeft, LogOut, ShieldCheck, X } from 'lucide-react'
-import { APP_NAME, APP_SUBTITLE, NAV_MENUS, ROLES } from '../../utils/constants.js'
+import { APP_NAME, APP_SUBTITLE, NAV_MENUS } from '../../utils/constants.js'
 import { selectRole, selectSidebarBadges } from '../../redux/selectors.js'
 import { selectSidebarCollapsed, setMobileNavOpen, toggleSidebar } from '../../redux/slices/uiSlice.js'
 import { logoutUser } from '../../redux/slices/authSlice.js'
@@ -36,9 +36,7 @@ function Brand({ collapsed }) {
 
 function NavItems({ collapsed, badges, onNavigate }) {
   const role = useSelector(selectRole)
-  const items = (NAV_MENUS[role === ROLES.CITIZEN ? 'citizen' : 'authority'] ?? []).filter((item) =>
-    item.roles.includes(role),
-  )
+  const items = (NAV_MENUS[role] ?? []).filter((item) => item.roles.includes(role))
 
   return (
     <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Main navigation">
@@ -139,7 +137,7 @@ export default function Sidebar() {
       {/* Desktop rail / expanded panel */}
       <aside
         className={`fixed inset-y-0 left-0 z-40 hidden shrink-0 transition-[width] duration-200 shadow-[3px_0_12px_rgba(6,42,58,0.08)] lg:block ${
-          collapsed ? 'w-[76px]' : 'w-64'
+          collapsed ? 'w-19' : 'w-64'
         }`}
       >
         <SidebarBody collapsed={collapsed} badges={badges} onNavigate={() => {}} onSignOut={signOut} />
@@ -164,7 +162,7 @@ export default function Sidebar() {
             className="absolute inset-0 bg-navy-900/60 backdrop-blur-sm"
           />
           <div
-            className="absolute inset-y-0 left-0 w-72 max-w-[85vw] shadow-2xl animate-[var(--animate-slide-in)]"
+            className="absolute inset-y-0 left-0 w-72 max-w-[85vw] shadow-2xl animate-slide-in"
             key={location.pathname}
           >
             <SidebarBody collapsed={false} badges={badges} onNavigate={closeDrawer} onSignOut={signOut} />

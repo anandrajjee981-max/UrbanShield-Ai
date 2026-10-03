@@ -75,6 +75,14 @@ export const rejectReport = createAsyncThunk('reports/reject', async ({ id, reas
   }
 })
 
+export const deleteReport = createAsyncThunk('reports/delete', async (id, { rejectWithValue }) => {
+  try {
+    return await reportApi.deleteReport(id)
+  } catch (error) {
+    return rejectWithValue(error.message)
+  }
+})
+
 const initialState = {
   items: [],
   allItems: [],
@@ -240,6 +248,18 @@ const reportSlice = createSlice({
       .addCase(rejectReport.rejected, (state, action) => {
         state.actionLoading = false
         state.error = action.payload ?? 'Could not reject this report.'
+      })
+
+      .addCase(deleteReport.pending, (state) => {
+        state.actionLoading = true
+      })
+      .addCase(deleteReport.fulfilled, (state, action) => {
+        state.actionLoading = false
+        upsertReport(state, action.payload)
+      })
+      .addCase(deleteReport.rejected, (state, action) => {
+        state.actionLoading = false
+        state.error = action.payload ?? 'Could not delete this report.'
       })
   },
 })

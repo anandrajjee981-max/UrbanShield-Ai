@@ -18,7 +18,7 @@ import { addToast } from '../../redux/slices/uiSlice.js'
  */
 export default function Reports() {
   const dispatch = useDispatch()
-  const { reports, filters, pagination, loading, error, setFilters, clearFilters, goToPage, refetch } = useReports({ limit: 10 })
+  const { reports, filters, pagination, loading, error, setFilters, clearFilters, goToPage, refetch, deleteReport } = useReports({ limit: 10 })
   const [selectedIds, setSelectedIds] = useState([])
 
   useEffect(() => {
@@ -77,6 +77,14 @@ export default function Reports() {
         onToggleAll={(ids) => setSelectedIds((current) => (ids.every((id) => current.includes(id)) ? [] : ids))}
         emptyTitle="No reports match these filters"
         emptyMessage="Widen the date range, clear the ward or category filter, or search for something else."
+        onDelete={(id) => {
+          dispatch(deleteReport(id))
+            .then(() => refetch())
+            .catch((err) => {
+              console.error(err)
+              dispatch(addToast({ tone: 'danger', title: 'Delete failed', message: 'Could not delete report.' }))
+            })
+        }}
       />
 
       <p className="flex items-center gap-1.5 text-[11px] text-muted">

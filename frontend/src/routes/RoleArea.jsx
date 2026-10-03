@@ -16,11 +16,11 @@ function useRoleRedirect() {
   return { role, fallback: ROLE_HOME[role] ?? '/', from: location.pathname }
 }
 
-/** The authority area is a single role gate wrapping every officer and admin screen. */
+/** Authority-only pages. Admin tools live in their own role area. */
 export function AuthorityArea() {
   const { role, fallback, from } = useRoleRedirect()
 
-  if (role !== ROLES.AUTHORITY && role !== ROLES.ADMIN) {
+  if (role !== ROLES.AUTHORITY) {
     return <Navigate to={fallback} replace state={{ from }} />
   }
 

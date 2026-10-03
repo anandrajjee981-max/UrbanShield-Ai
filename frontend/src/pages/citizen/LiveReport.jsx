@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useSelector } from 'react-redux'
 import { ArrowLeft, Camera, CheckCircle2, MapPin, Phone, Siren, Upload, X } from 'lucide-react'
 import PageHeader from '../../components/common/PageHeader.jsx'
 import PageShell from '../../components/common/PageShell.jsx'
@@ -7,17 +6,14 @@ import Button, { ButtonLink } from '../../components/common/Button.jsx'
 import LocationPicker from '../../components/reports/LocationPicker.jsx'
 import { useGeolocation } from '../../hooks/useGeolocation.js'
 import { useReports } from '../../hooks/useReports.js'
-import { selectCurrentUser } from '../../redux/selectors.js'
 import { ISSUE_TYPES, WARDS } from '../../utils/constants.js'
 import { CITY } from '../../utils/constants.js'
 
 export default function LiveReport() {
-  const user = useSelector(selectCurrentUser)
   const { createReport, submitting } = useReports({ auto: false })
   const geolocation = useGeolocation({ auto: false })
   const [issueType, setIssueType] = useState('')
   const [description, setDescription] = useState('')
-  const [contactPhone, setContactPhone] = useState(user?.phone ?? '')
   const [ward, setWard] = useState('')
   const [address, setAddress] = useState('')
   const [location, setLocation] = useState(null)
@@ -71,7 +67,6 @@ export default function LiveReport() {
     })
     setIssueType('')
     setDescription('')
-    setContactPhone(user?.phone ?? '')
     setWard('')
     setAddress('')
     setLocation(null)
@@ -85,10 +80,6 @@ export default function LiveReport() {
     event.preventDefault()
     const nextErrors = {}
     if (!selectedType) nextErrors.issueType = 'Choose an issue type.'
-    if (description.trim().length < 10) nextErrors.description = 'Add a short description (at least 10 characters).'
-    if (!location) nextErrors.location = 'Share your location or pin it on the map.'
-    if (!ward) nextErrors.ward = 'Select the ward.'
-    if (!contactPhone.trim()) nextErrors.contactPhone = 'Add a phone number so the team can contact you.'
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length) return
 
@@ -96,17 +87,17 @@ export default function LiveReport() {
       issueType: selectedType.value,
       issueLabel: selectedType.label,
       category: selectedType.category,
-      title: `${selectedType.label} - ${address.trim() || ward}`,
+      title: address.trim() || ward ? `${selectedType.label} - ${address.trim() || ward}` : selectedType.label,
       description: description.trim(),
       ward,
       address: address.trim(),
-      latitude: location.latitude,
-      longitude: location.longitude,
+      latitude: location?.latitude ?? null,
+      longitude: location?.longitude ?? null,
       photos,
       priority: 'high',
-      contactPhone: contactPhone.trim(),
-      contactEmail: user?.email ?? '',
-      anonymous: false,
+      contactPhone: '',
+      contactEmail: '',
+      anonymous: true,
     })
 
     if (result.meta.requestStatus === 'fulfilled') setSubmitted(result.payload)
@@ -138,7 +129,7 @@ export default function LiveReport() {
       <PageHeader
         eyebrow={`${CITY.name} · Quick reporting`}
         title="Live Report"
-        subtitle="Send a concise, high-priority report with your contact number, location, and optional photos."
+        subtitle="Submit a civic issue anonymously. Only issue type is required; description, ward, location, and photos are optional. No name, phone, or email is attached."
         actions={
           <ButtonLink to="/citizen/report" variant="secondary" size="sm" icon={ArrowLeft}>
             Full report form
@@ -148,7 +139,7 @@ export default function LiveReport() {
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
         <form className="card min-w-0 space-y-5 p-4 sm:p-6" onSubmit={handleSubmit} noValidate>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div>
             <div>
               <label htmlFor="live-issue-type" className="text-[12px] font-semibold text-ink">
                 Issue type <span className="text-risk-high">*</span>
@@ -165,29 +156,11 @@ export default function LiveReport() {
               </select>
               {errors.issueType ? <p className="mt-1 text-[11px] text-risk-high">{errors.issueType}</p> : null}
             </div>
-
-            <div>
-              <label htmlFor="live-phone" className="text-[12px] font-semibold text-ink">
-                Callback phone <span className="text-risk-high">*</span>
-              </label>
-              <input
-                id="live-phone"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                value={contactPhone}
-                onChange={(event) => setContactPhone(event.target.value)}
-                placeholder="+91 98765 43210"
-                aria-invalid={Boolean(errors.contactPhone)}
-                className="input mt-1.5 text-[13px]"
-              />
-              {errors.contactPhone ? <p className="mt-1 text-[11px] text-risk-high">{errors.contactPhone}</p> : null}
-            </div>
           </div>
 
           <div>
             <label htmlFor="live-description" className="text-[12px] font-semibold text-ink">
-              What is happening? <span className="text-risk-high">*</span>
+              What is happening? <span className="font-normal text-muted">(optional)</span>
             </label>
             <textarea
               id="live-description"
@@ -201,7 +174,7 @@ export default function LiveReport() {
             />
             <div className="mt-1 flex justify-between gap-3 text-[11px]">
               <span className={errors.description ? 'text-risk-high' : 'text-muted'}>
-                {errors.description ?? 'At least 10 characters.'}
+                {errors.description ?? 'Optional description.'}
               </span>
               <span className="shrink-0 text-muted">{description.length}/600</span>
             </div>
@@ -210,7 +183,7 @@ export default function LiveReport() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="live-ward" className="text-[12px] font-semibold text-ink">
-                Ward <span className="text-risk-high">*</span>
+                Ward <span className="font-normal text-muted">(optional)</span>
               </label>
               <select
                 id="live-ward"
@@ -239,7 +212,7 @@ export default function LiveReport() {
           <section aria-labelledby="live-location-heading">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 id="live-location-heading" className="text-[12px] font-semibold text-ink">Report location</h2>
+                <h2 id="live-location-heading" className="text-[12px] font-semibold text-ink">Report location <span className="font-normal text-muted">(optional)</span></h2>
                 <p className="mt-0.5 text-[11px] text-muted">
                   {location ? `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}` : 'Use GPS or place a pin manually.'}
                 </p>
@@ -264,7 +237,6 @@ export default function LiveReport() {
               </div>
             </div>
             {geolocation.error ? <p className="mt-2 text-[11px] text-risk-medium">{geolocation.error}</p> : null}
-            {errors.location ? <p className="mt-2 text-[11px] text-risk-high">{errors.location}</p> : null}
             {showMapPicker ? (
               <div className="mt-3 overflow-hidden rounded-lg border border-line">
                 <LocationPicker value={location} onChange={setLocation} />

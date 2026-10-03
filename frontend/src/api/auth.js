@@ -11,8 +11,8 @@ const getUser = (response) => {
   const user = response?.data?.user ?? response?.user
   if (!user) return null
 
-  const role = user.role?.toLowerCase() ?? 'citizen'
-  return { ...user, role, roleLabel: user.roleLabel ?? ROLE_LABELS[role] ?? 'Citizen' }
+  const role = typeof user.role === 'string' ? user.role.toLowerCase() : null
+  return { ...user, role, roleLabel: user.roleLabel ?? ROLE_LABELS[role] ?? 'Unknown role' }
 }
 
 export const register = (payload) =>
