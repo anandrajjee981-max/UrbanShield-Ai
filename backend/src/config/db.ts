@@ -1,6 +1,32 @@
+import { setDefaultResultOrder } from 'node:dns';
+import { setDefaultAutoSelectFamily } from 'node:net';
+import { networkInterfaces } from 'node:os';
 import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg';
 import { env } from './env.js';
 import { logger } from '../utils/logger.js';
+
+/**
+ * Reachability fix for hosts without global IPv6 (Docker bridge networks being
+ * the common case).
+ *
+ * Neon publishes both A and AAAA records, and Node 20 races all of them via
+ * happy-eyeballs. On an IPv4 only network the AAAA attempts are unroutable, the
+ * race is aborted, and the whole connect fails with
+ * `AggregateError [ETIMEDOUT]` - even though every A record answers fine. That
+ * aborted connect is what used to kill the server at boot, which surfaced in the
+ * browser as a 502 on every proxied `/api` request.
+ *
+ * `pg` has no per-connection `family` option, so the DNS defaults have to be set
+ * before the pool is created.
+ */
+const hasGlobalIPv6 = Object.values(networkInterfaces())
+  .flatMap((addresses) => addresses ?? [])
+  .some((address) => address.family === 'IPv6' && !address.internal && !address.address.startsWith('fe80:'));
+
+if (!hasGlobalIPv6) {
+  setDefaultResultOrder('ipv4first');
+  setDefaultAutoSelectFamily(false);
+}
 
 /**
  * PostgreSQL connection pool.

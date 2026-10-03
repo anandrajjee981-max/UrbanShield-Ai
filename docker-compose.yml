@@ -1,0 +1,31 @@
+services:
+  backend:
+    build: ./backend              # build image from backend/Dockerfile
+    ports:
+      - "5000:4000"               # HOST:CONTAINER
+    volumes:
+      - ./backend:/app                       # bind mount: your code → container
+      - backend-node-modules:/app/node_modules  # named volume: protect deps
+    environment:
+      - PORT=4000
+      - FRONTEND_URL=http://localhost:3000
+    command: npm run dev                     # runs the TypeScript entry point with tsx
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:5173"                         # host 3000 → vite's 5173
+    environment:
+      - VITE_API_PROXY_TARGET=http://backend:4000
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+    command: npm run dev -- --host          # --host exposes vite outside container
+
+# All named volumes must be declared here
+volumes:
+  backend-node-modules:
+  frontend-node-modules:
+
+
+

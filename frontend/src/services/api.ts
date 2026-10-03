@@ -4,7 +4,7 @@ import axios, { AxiosError } from 'axios';
  * Real backend client for UrbanShield-Ai.
  *
  * Backend contract (backend/src):
- * - Base: http://localhost:4000/api (see backend/.env PORT + FRONTEND_URL)
+ * - Base: /api, forwarded to the backend by the Vite proxy in development.
  * - Auth is cookie-only: POST /auth/register|/login writes an HTTP-only
  *   `access_token` cookie. The browser replays it automatically, so
  *   `withCredentials: true` is required and no token is stored in JS.
@@ -16,7 +16,7 @@ import axios, { AxiosError } from 'axios';
  */
 
 export const API_BASE_URL =
-  import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api';
+  import.meta.env.VITE_API_URL ?? '/api';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -51,7 +51,7 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
     if (typeof data?.message === 'string' && data.message.length > 0) return data.message;
     if (error.code === 'ECONNABORTED') return 'Request timed out. Please try again.';
     if (error.message === 'Network Error') {
-      return 'Cannot reach the backend. Is it running on http://localhost:4000?';
+      return 'Cannot reach the backend. Check that the backend service is running and can connect to its database.';
     }
   }
   if (error instanceof Error && error.message) return error.message;
