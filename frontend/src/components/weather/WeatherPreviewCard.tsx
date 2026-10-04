@@ -8,7 +8,7 @@ export default function WeatherPreviewCard() {
   const navigate = useNavigate();
   const { location, forecast, loading, error } = useWeather();
 
-  const today = forecast[0];
+  const today = forecast[forecast.length - 1];
 
   return (
     <section className="gs-in mt-4 bg-card border border-line rounded-2xl p-5 shadow-sm">
@@ -57,7 +57,7 @@ export default function WeatherPreviewCard() {
         <div className="grid grid-cols-3 gap-2 mt-4">
           {forecast.map((d) => (
             <button
-              key={d.date}
+              key={`${d.label}-${d.date}`}
               onClick={() => navigate('/weather')}
               className="bg-canvas border border-line rounded-xl px-2 py-2.5 text-center hover:border-brand transition-colors"
             >

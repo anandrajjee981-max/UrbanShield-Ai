@@ -7,7 +7,7 @@ import { uploadIssueImage } from '../middleware/upload.middleware.js';
 import { validateBody } from '../middleware/validate.middleware.js';
 import { TooManyRequestsError } from '../utils/api-error.js';
 import { createIssueSchema } from '../validation/issue.schema.js';
-
+import {deleteIssueHandler} from '../controller/issue.controller.js';
 
 
 const issueRouter = Router();
@@ -62,5 +62,6 @@ issueRouter.post(
 
 /** GET /api/issues/my */
 issueRouter.get('/my', authenticate, issueController.listMyIssues);
-
+issueRouter.delete('/:id', authenticate, deleteIssueHandler);  
+  
 export default issueRouter;

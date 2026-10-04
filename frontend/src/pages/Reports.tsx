@@ -1,20 +1,22 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { fetchReports } from '../store/slices/reportsSlice';
+import { deleteReport, fetchReports } from '../store/slices/reportsSlice';
+import { setGlobalSearch } from '../store/slices/uiSlice';
+import { citizenReportFields, matchesQuery } from '../utils/issueSearch';
 import ReportCard from '../components/reports/ReportCard';
-import ReportsMap from '../components/reports/ReportsMap';
 import ReportFormModal from '../components/reports/ReportFormModal';
 import Loader from '../components/common/Loader';
 import { useGsapEntrance } from '../hooks/useGsapEntrance';
 
 export default function Reports() {
   const dispatch = useAppDispatch();
-  const { items, loading, error } = useAppSelector((s) => s.reports);
+  const { items, loading, error, deletingId } = useAppSelector((s) => s.reports);
+  const globalSearch = useAppSelector((s) => s.ui.globalSearch);
+  const filtered = items.filter((r) => matchesQuery(globalSearch, citizenReportFields(r)));
   const [formOpen, setFormOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const mapRef = useRef<HTMLDivElement>(null);
   useGsapEntrance('.gs-in', [items.length]);
   useEffect(() => { dispatch(fetchReports()); }, [dispatch]);
   useEffect(() => {
@@ -23,11 +25,19 @@ export default function Reports() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  /** Tapping a card highlights its pin + centers the map; on phones scrolls the map into view. */
+  /** Tapping a card highlights it (toggle ring). */
   const handleSelect = (id: string) => {
     setSelectedId((prev) => (prev === id ? null : id));
-    if (window.innerWidth < 640) {
-      mapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  /** Confirmed delete → DELETE /api/issues/:id, then drop the row from the list. */
+  const handleDelete = async (id: string) => {
+    const res = await dispatch(deleteReport(id));
+    setSelectedId((prev) => (prev === id ? null : prev));
+    if (deleteReport.fulfilled.match(res)) {
+      setToast(`Report ${id.slice(0, 8)} deleted.`);
+    } else {
+      setToast((res.payload as string) ?? 'Could not delete the report.');
     }
   };
 
@@ -39,12 +49,12 @@ export default function Reports() {
         <button onClick={() => setFormOpen(true)} className="shrink-0 text-sm font-bold px-4 py-2.5 rounded-xl bg-brand text-white hover:bg-brand-warm">+ New Report</button>
       </div>
       <p className="text-xs text-mute">Live from GET /api/issues/my — track REPORTED → VERIFIED → ASSIGNED → IN_PROGRESS → RESOLVED on each card.</p>
-
-      {/* City map on top, report list below (phone-first stacking) */}
-      <div ref={mapRef} className="scroll-mt-20">
-        <ReportsMap reports={items} selectedId={selectedId} onSelect={handleSelect} />
-      </div>
-      <p className="text-[11px] text-mute">Tap a pin or a card below to locate a report on the map.</p>
+      {globalSearch.trim() && (
+        <p className="text-xs font-semibold text-soft flex items-center gap-2 flex-wrap">
+          <span>Showing {filtered.length} of {items.length} for “{globalSearch.trim()}”</span>
+          <button onClick={() => dispatch(setGlobalSearch(''))} className="underline text-brand">Clear search</button>
+        </p>
+      )}
 
       {error && (
         <div className="flex items-center justify-between gap-3 text-xs font-semibold px-3 py-2.5 rounded-xl bg-[#fde8e2] text-brand">
@@ -57,14 +67,19 @@ export default function Reports() {
           No reports yet — click “+ New Report” to file your first issue.
         </p>
       )}
+      {items.length > 0 && filtered.length === 0 && !loading && (
+        <p className="text-sm text-soft border border-dashed border-line rounded-xl p-6 text-center">
+          No reports match “{globalSearch.trim()}” — try “flood”, “heat”, “resolved” or a place name.
+        </p>
+      )}
       <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-        {items.map((r) => (
+        {filtered.map((r) => (
           <div
             key={r.id}
             onClick={() => handleSelect(r.id)}
             className={`cursor-pointer rounded-2xl transition-shadow ${selectedId === r.id ? 'ring-2 ring-brand shadow-md' : ''}`}
           >
-            <ReportCard report={r} />
+            <ReportCard report={r} onDelete={handleDelete} deleting={deletingId === r.id} />
           </div>
         ))}
       </div>

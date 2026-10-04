@@ -10,7 +10,7 @@ import axios, { AxiosError } from 'axios';
  *   `withCredentials: true` is required and no token is stored in JS.
  * - Envelope: { success: true, message, data } / { success: false, message, code, errors? }
  * - Issues: POST /issues/ (JSON or multipart with `image` field),
- *   POST /issues/upload, GET /issues/my
+ *   POST /issues/upload, GET /issues/my, DELETE /issues/:id
  * - Admin: GET /admin/issues, GET /admin/issues/:id,
  *   PATCH /admin/issues/:id/verify, PATCH /admin/issues/:id/reject
  */
@@ -209,6 +209,12 @@ export async function logoutRequest(): Promise<void> {
 export async function fetchMyIssuesRequest(): Promise<BackendSafeIssue[]> {
   const res = await api.get<ApiSuccess<{ issues: BackendSafeIssue[] }>>('/issues/my');
   return res.data.data.issues;
+}
+
+/** Deletes one of the caller's own reports — DELETE /api/issues/:id */
+export async function deleteIssueRequest(issueId: string): Promise<string> {
+  const res = await api.delete<ApiSuccess<{ issueId: string }>>(`/issues/${issueId}`);
+  return res.data.data.issueId;
 }
 
 /** Standalone photo upload — returns the reference to send with createIssue. */

@@ -14,7 +14,12 @@ export default function Dashboard() {
   const dispatch = useAppDispatch();
   const { kpis, trend, distribution, loading } = useAppSelector((s) => s.dashboard);
   const incidents = useAppSelector((s) => s.incidents.items);
+  const globalSearch = useAppSelector((s) => s.ui.globalSearch);
   const role = useAppSelector((s) => s.auth.user?.role ?? 'CITIZEN');
+  const q = globalSearch.trim().toLowerCase();
+  const visibleIncidents = incidents.filter((i) =>
+    q === '' || `${i.title} ${i.address} ${i.category} ${i.description} ${i.status}`.toLowerCase().includes(q),
+  );
   useGsapEntrance('.gs-in', [kpis.length]);
 
   useEffect(() => {
@@ -34,10 +39,13 @@ export default function Dashboard() {
         <RiskPie data={distribution} />
       </div>
       <div>
-        <h2 className="font-bold mb-2">Latest active incidents</h2>
+        <h2 className="font-bold mb-2">Latest active incidents{q && ` — matching “${globalSearch.trim()}”`}</h2>
         <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-          {incidents.slice(0, 6).map((i) => <IncidentCard key={i.id} incident={i} />)}
+          {visibleIncidents.slice(0, 6).map((i) => <IncidentCard key={i.id} incident={i} />)}
         </div>
+        {visibleIncidents.length === 0 && (
+          <p className="text-sm text-mute">No incidents match the current search.</p>
+        )}
       </div>
     </div>
   );

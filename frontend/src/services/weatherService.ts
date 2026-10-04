@@ -23,7 +23,7 @@ export interface WeatherLocation {
 export interface WeatherDay {
   /** ISO calendar date in the location's timezone, e.g. "2026-10-04". */
   date: string;
-  /** "Today" | "Tomorrow" | "Day After Tomorrow". */
+  /** "Day Before Yesterday" | "Yesterday" | "Today". */
   label: string;
   /** Local weekday, e.g. "Sunday". */
   weekday: string;

@@ -406,3 +406,7 @@ export const deleteRejectedIssue = async (id: string): Promise<boolean> => {
 
   return (rowCount ?? 0) > 0;
 };
+
+export const deleteIssue = async (id: string): Promise<void> => {
+  await query('DELETE FROM issues WHERE id = $1', [id]);
+};

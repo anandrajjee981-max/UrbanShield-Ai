@@ -17,6 +17,18 @@ function sunTime(unix: number, tzOffset: number): string {
   return new Date((unix + tzOffset) * 1000).toISOString().slice(11, 16);
 }
 
+/** "2026-10-04" -> "4 Oct 2026" (falls back to the raw value if invalid). */
+function formatDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
 function Detail({
   icon,
   label,
@@ -63,7 +75,7 @@ export default function ForecastCard({
             )}
           </p>
           <p className="text-xs font-semibold text-mute mt-0.5">
-            {day.weekday} · {day.date}
+            {day.weekday} · {formatDate(day.date)}
           </p>
         </div>
         <WeatherIcon icon={day.icon} condition={day.condition} size={64} />
@@ -131,7 +143,12 @@ export function ThreeDayForecast({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {forecast.map((day, i) => (
-        <ForecastCard key={day.date} day={day} timezoneOffset={timezoneOffset} highlight={i === 0} />
+        <ForecastCard
+          key={`${day.label}-${day.date}`}
+          day={day}
+          timezoneOffset={timezoneOffset}
+          highlight={i === forecast.length - 1}
+        />
       ))}
     </div>
   );

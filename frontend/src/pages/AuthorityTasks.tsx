@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { MapPin, Play, CheckCheck, User } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchBrowseReports, fetchMyTasks, resolveTaskThunk, startTaskThunk } from '../store/slices/workflowSlice';
+import { setGlobalSearch } from '../store/slices/uiSlice';
+import { adminIssueFields, matchesQuery, safeIssueFields } from '../utils/issueSearch';
 import Loader from '../components/common/Loader';
 import AnalysisCard from '../components/workflow/AnalysisCard';
 import WorkflowTracker from '../components/workflow/WorkflowTracker';
@@ -13,10 +15,13 @@ export default function AuthorityTasks() {
   const dispatch = useAppDispatch();
   const { tasks, tasksLoading, browse, browseLoading, actionLoading, error } = useAppSelector((s) => s.workflow);
   const myId = useAppSelector((s) => s.auth.user?.id);
+  const globalSearch = useAppSelector((s) => s.ui.globalSearch);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [tab, setTab] = useState<'mine' | 'all'>('mine');
   const [filter, setFilter] = useState<(typeof BROWSE_FILTERS)[number]>('ALL');
   useGsapEntrance('.gs-in', [tasks.length, browse.length, tab]);
+  const visibleTasks = tasks.filter((t) => matchesQuery(globalSearch, safeIssueFields(t)));
+  const visibleBrowse = browse.filter((b) => matchesQuery(globalSearch, adminIssueFields(b)));
 
   useEffect(() => {
     dispatch(fetchMyTasks());
@@ -28,7 +33,7 @@ export default function AuthorityTasks() {
 
   if (tasksLoading && tasks.length === 0) return <Loader label="Loading your tasks…" />;
 
-  const active = tasks.filter((t) => t.status === 'ASSIGNED' || t.status === 'IN_PROGRESS');
+  const active = visibleTasks.filter((t) => t.status === 'ASSIGNED' || t.status === 'IN_PROGRESS');
 
   return (
     <div className="space-y-4">
@@ -39,8 +44,8 @@ export default function AuthorityTasks() {
 
       <div className="flex gap-1.5 bg-canvas border border-line rounded-xl p-1 w-fit">
         {([
-          { key: 'mine', label: `My Tasks (${tasks.length})` },
-          { key: 'all', label: `All Citizen Reports (${browse.length})` },
+          { key: 'mine', label: `My Tasks (${visibleTasks.length})` },
+          { key: 'all', label: `All Citizen Reports (${visibleBrowse.length})` },
         ] as const).map((t) => (
           <button
             key={t.key}
@@ -56,6 +61,13 @@ export default function AuthorityTasks() {
 
       {error && <p className="text-xs font-semibold px-3 py-2.5 rounded-xl bg-[#fde8e2] text-brand whitespace-pre-line">{error}</p>}
 
+      {globalSearch.trim() && (
+        <p className="text-xs font-semibold text-soft flex items-center gap-2 flex-wrap">
+          <span>Search “{globalSearch.trim()}” — {tab === 'mine' ? `${visibleTasks.length} of ${tasks.length} tasks` : `${visibleBrowse.length} of ${browse.length} reports`}</span>
+          <button onClick={() => dispatch(setGlobalSearch(''))} className="underline text-brand">Clear search</button>
+        </p>
+      )}
+
       {/* ── MY TASKS (actionable) ── */}
       {tab === 'mine' && (
         <>
@@ -64,8 +76,13 @@ export default function AuthorityTasks() {
               No tasks assigned to you yet — the admin assigns VERIFIED issues from the review queue.
             </p>
           )}
+          {tasks.length > 0 && visibleTasks.length === 0 && !tasksLoading && (
+            <p className="text-sm text-soft border border-dashed border-line rounded-xl p-6 text-center">
+              No tasks match “{globalSearch.trim()}” — try “flood”, “heat”, “resolved” or a place name.
+            </p>
+          )}
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {tasks.map((t) => (
+            {visibleTasks.map((t) => (
               <div key={t.id} className="gs-in bg-card border border-line rounded-2xl p-4 space-y-2.5">
                 <div className="flex items-start justify-between gap-2">
                   <p className="font-bold text-sm line-clamp-2 min-w-0">{t.description.slice(0, 100)}</p>
@@ -143,9 +160,13 @@ export default function AuthorityTasks() {
             <p className="text-sm text-soft border border-dashed border-line rounded-xl p-6 text-center">
               No {filter === 'ALL' ? '' : `${filter} `}reports on the city right now.
             </p>
+          ) : visibleBrowse.length === 0 ? (
+            <p className="text-sm text-soft border border-dashed border-line rounded-xl p-6 text-center">
+              No reports match “{globalSearch.trim()}” — try a name, “flood”, “heat” or a status like “resolved”.
+            </p>
           ) : (
             <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-              {browse.map((b) => (
+              {visibleBrowse.map((b) => (
                 <div key={b.id} className="gs-in bg-card border border-line rounded-2xl p-4 space-y-2.5">
                   <div className="flex items-start justify-between gap-2">
                     <p className="font-bold text-sm line-clamp-2 min-w-0">{b.description.slice(0, 100)}</p>

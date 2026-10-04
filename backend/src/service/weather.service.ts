@@ -13,11 +13,16 @@ import { logger } from '../utils/logger.js';
  * Two OpenWeatherMap endpoints are combined:
  *  - /data/2.5/weather  - current observation (also carries timezone, sunrise,
  *    sunset and the canonical city/country spelling)
- *  - /data/2.5/forecast - 5-day / 3-hour entries used to build Tomorrow and
- *    Day After Tomorrow (and to enrich Today with min/max + rain chance)
+ *  - /data/2.5/forecast - 5-day / 3-hour entries used to enrich Today with
+ *    min/max + rain chance
  *
- * Forecast entries are grouped by *local* calendar date (UTC timestamp plus
- * the location's `timezone` offset) and aggregated per day - never just the
+ * OpenWeatherMap's free API only serves current + future data, so the two
+ * previous days (Day Before Yesterday, Yesterday) come from the free
+ * Open-Meteo API (no key required), requested server to server.
+ *
+ * The 3-day window is [Day Before Yesterday, Yesterday, Today]. Forecast
+ * entries are grouped by *local* calendar date (UTC timestamp plus the
+ * location's `timezone` offset) and aggregated per day - never just the
  * first three raw records.
  */
 
@@ -35,7 +40,7 @@ export interface WeatherLocation {
 export interface WeatherDay {
   /** ISO calendar date in the location's timezone, e.g. "2026-10-04". */
   date: string;
-  /** "Today" | "Tomorrow" | "Day After Tomorrow". */
+  /** "Day Before Yesterday" | "Yesterday" | "Today". */
   label: string;
   /** Local weekday, e.g. "Sunday". */
   weekday: string;
@@ -200,10 +205,107 @@ const owmFetch = async <T>(path: string, params: URLSearchParams): Promise<T> =>
 };
 
 // ---------------------------------------------------------------------------
+// Past days via Open-Meteo (free, no key) - OpenWeatherMap's free tier has
+// no history endpoint, so Day Before Yesterday + Yesterday come from here.
+// ---------------------------------------------------------------------------
+
+interface OpenMeteoPast {
+  daily?: {
+    time?: string[];
+    temperature_2m_max?: (number | null)[];
+    temperature_2m_min?: (number | null)[];
+    weathercode?: (number | null)[];
+    precipitation_probability_max?: (number | null)[];
+    windspeed_10m_max?: (number | null)[];
+    winddirection_10m_dominant?: (number | null)[];
+  };
+  hourly?: {
+    time?: string[];
+    temperature_2m?: (number | null)[];
+    relative_humidity_2m?: (number | null)[];
+    apparent_temperature?: (number | null)[];
+    pressure_msl?: (number | null)[];
+    visibility?: (number | null)[];
+  };
+}
+
+/** WMO weather-code -> display condition + OpenWeatherMap-style icon code. */
+const wmoToCondition = (code: number | null | undefined): { condition: string; icon: string } => {
+  switch (code) {
+    case 0: return { condition: 'Clear Sky', icon: '01d' };
+    case 1: return { condition: 'Mainly Clear', icon: '01d' };
+    case 2: return { condition: 'Partly Cloudy', icon: '02d' };
+    case 3: return { condition: 'Overcast Clouds', icon: '04d' };
+    case 45: return { condition: 'Fog', icon: '50d' };
+    case 48: return { condition: 'Icy Fog', icon: '50d' };
+    case 51: return { condition: 'Light Drizzle', icon: '09d' };
+    case 53: return { condition: 'Drizzle', icon: '09d' };
+    case 55: return { condition: 'Heavy Drizzle', icon: '09d' };
+    case 56:
+    case 57: return { condition: 'Freezing Drizzle', icon: '09d' };
+    case 61: return { condition: 'Light Showers', icon: '10d' };
+    case 63: return { condition: 'Moderate Rain', icon: '10d' };
+    case 65: return { condition: 'Heavy Rain', icon: '10d' };
+    case 66:
+    case 67: return { condition: 'Freezing Rain', icon: '13d' };
+    case 71: return { condition: 'Light Snow', icon: '13d' };
+    case 73: return { condition: 'Snow', icon: '13d' };
+    case 75: return { condition: 'Heavy Snow', icon: '13d' };
+    case 77: return { condition: 'Snow Grains', icon: '13d' };
+    case 80: return { condition: 'Light Showers', icon: '09d' };
+    case 81: return { condition: 'Rain Showers', icon: '09d' };
+    case 82: return { condition: 'Heavy Showers', icon: '09d' };
+    case 85:
+    case 86: return { condition: 'Snow Showers', icon: '13d' };
+    case 95: return { condition: 'Thunderstorm', icon: '11d' };
+    case 96:
+    case 99: return { condition: 'Thunderstorm With Hail', icon: '11d' };
+    default: return { condition: 'Unknown', icon: '02d' };
+  }
+};
+
+const fetchPastDays = async (lat: number, lon: number): Promise<OpenMeteoPast> => {
+  const params = new URLSearchParams({
+    latitude: String(lat),
+    longitude: String(lon),
+    past_days: '2',
+    forecast_days: '1',
+    timezone: 'auto',
+    daily: [
+      'temperature_2m_max',
+      'temperature_2m_min',
+      'weathercode',
+      'precipitation_probability_max',
+      'windspeed_10m_max',
+      'winddirection_10m_dominant',
+    ].join(','),
+    hourly: [
+      'temperature_2m',
+      'relative_humidity_2m',
+      'apparent_temperature',
+      'pressure_msl',
+      'visibility',
+    ].join(','),
+  });
+  try {
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) throw new Error(`Open-Meteo status ${res.status}`);
+    return (await res.json()) as OpenMeteoPast;
+  } catch (error) {
+    logger.warn('Open-Meteo past days unreachable', {
+      error: error instanceof Error ? error.message : 'unknown',
+    });
+    throw new AppError(503, 'Unable to load weather data. Please try again.', 'WEATHER_UNAVAILABLE');
+  }
+};
+
+// ---------------------------------------------------------------------------
 // Main entry: fetch, group by local date, aggregate exactly 3 days
 // ---------------------------------------------------------------------------
 
-const DAY_LABELS = ['Today', 'Tomorrow', 'Day After Tomorrow'] as const;
+const DAY_LABELS = ['Day Before Yesterday', 'Yesterday', 'Today'] as const;
 
 export const getThreeDayWeather = async (query: WeatherQuery): Promise<WeatherResponse> => {
   if (!query.city && (query.lat === undefined || query.lon === undefined)) {
@@ -232,12 +334,75 @@ export const getThreeDayWeather = async (query: WeatherQuery): Promise<WeatherRe
   const latitude = current.coord?.lat ?? forecast.city?.coord?.lat ?? query.lat ?? 0;
   const longitude = current.coord?.lon ?? forecast.city?.coord?.lon ?? query.lon ?? 0;
 
-  const todayKey = localDateKey(current.dt, tz);
-  const dayKeys = [0, 1, 2].map((offset) => {
+  // Anchor the 3-day window to the LIVE server clock (shifted into the
+  // location's timezone), not to the upstream `current.dt` observation time.
+  // `current.dt` can lag behind real time (upstream update interval + our
+  // cache), which used to freeze "Today" on yesterday's date past midnight.
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const todayKey = localDateKey(nowSeconds, tz);
+  // Window = [Day Before Yesterday, Yesterday, Today].
+  const dayKeys = [-2, -1, 0].map((offset) => {
     const d = new Date(`${todayKey}T00:00:00Z`);
     d.setUTCDate(d.getUTCDate() + offset);
     return d.toISOString().slice(0, 10);
   });
+
+  // Previous days come from Open-Meteo (daily + hourly aggregates).
+  const past = await fetchPastDays(latitude, longitude);
+  const hourlyIndexOf = (dateKey: string): number[] => {
+    const times = past.hourly?.time ?? [];
+    const out: number[] = [];
+    times.forEach((t, idx) => {
+      if (t?.slice(0, 10) === dateKey) out.push(idx);
+    });
+    return out;
+  };
+  const dailyAt = (arr: (number | null)[] | undefined, dateKey: string): number | undefined => {
+    const at = past.daily?.time?.indexOf(dateKey) ?? -1;
+    const v = at >= 0 ? arr?.[at] : undefined;
+    return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+  };
+  const hourlyAvg = (arr: (number | null)[] | undefined, idx: number[]): number =>
+    avg(idx.map((i) => arr?.[i]).filter((v): v is number => typeof v === 'number' && Number.isFinite(v)));
+
+  /** A previous day built from Open-Meteo daily + hourly aggregates. */
+  const buildPastDay = (dateKey: string, label: string): WeatherDay => {
+    const idx = hourlyIndexOf(dateKey);
+    const dMin = dailyAt(past.daily?.temperature_2m_min, dateKey);
+    const dMax = dailyAt(past.daily?.temperature_2m_max, dateKey);
+    const meanTemp = hourlyAvg(past.hourly?.temperature_2m, idx);
+    const temperature = Number.isFinite(meanTemp) && idx.length > 0
+      ? meanTemp
+      : avg([dMin, dMax].filter((v): v is number => v !== undefined));
+    const feels = hourlyAvg(past.hourly?.apparent_temperature, idx);
+    const { condition, icon } = wmoToCondition(dailyAt(past.daily?.weathercode, dateKey));
+    const windDegVal = dailyAt(past.daily?.winddirection_10m_dominant, dateKey) ?? 0;
+    const humidity = hourlyAvg(past.hourly?.relative_humidity_2m, idx);
+    const pressure = hourlyAvg(past.hourly?.pressure_msl, idx);
+    const visibility = hourlyAvg(past.hourly?.visibility, idx);
+    return {
+      date: dateKey,
+      label,
+      weekday: weekdayOf(dateKey),
+      temperature: round1(Number.isFinite(temperature) ? temperature : current.main.temp),
+      feelsLike: round1(Number.isFinite(feels) && idx.length > 0 ? feels : (Number.isFinite(temperature) ? temperature : current.main.feels_like)),
+      min: round1(dMin ?? (Number.isFinite(temperature) ? temperature : current.main.temp_min)),
+      max: round1(dMax ?? (Number.isFinite(temperature) ? temperature : current.main.temp_max)),
+      condition,
+      icon,
+      humidity: round0(Number.isFinite(humidity) && idx.length > 0 ? humidity : current.main.humidity),
+      // Open-Meteo wind speed is already km/h (no m/s conversion needed).
+      windSpeedKmh: round1(dailyAt(past.daily?.windspeed_10m_max, dateKey) ?? 0),
+      windDeg: round0(windDegVal),
+      windDirection: toCompass(windDegVal),
+      pressure: round0(Number.isFinite(pressure) && idx.length > 0 ? pressure : current.main.pressure),
+      visibility: round0(Number.isFinite(visibility) && idx.length > 0 ? visibility : (current.visibility ?? 10000)),
+      rainChance: round0(dailyAt(past.daily?.precipitation_probability_max, dateKey) ?? 0),
+      // Only Today carries sunrise/sunset (live observation), as before.
+      sunrise: null,
+      sunset: null,
+    };
+  };
 
   // Group forecast entries by local calendar date.
   const byDate = new Map<string, OwmForecastEntry[]>();
@@ -249,17 +414,35 @@ export const getThreeDayWeather = async (query: WeatherQuery): Promise<WeatherRe
   }
 
   const forecastDays: WeatherDay[] = dayKeys.map((dateKey, i) => {
+    const isToday = i === 2;
+    // Previous days come from Open-Meteo; only Today uses the live
+    // OpenWeatherMap observation + forecast entries.
+    if (!isToday) return buildPastDay(dateKey, DAY_LABELS[i] ?? `Day ${i + 1}`);
+
     let entries = byDate.get(dateKey) ?? [];
     if (entries.length === 0) {
       // Fallback: nearest entries so a day is never empty (API edge cases).
       const all = forecast.list ?? [];
-      entries = all.length > 0 ? [all.reduce((a, b) => (Math.abs(b.dt - current.dt - i * 86400) < Math.abs(a.dt - current.dt - i * 86400) ? b : a))] : [];
+      entries = all.length > 0 ? [all.reduce((a, b) => (Math.abs(b.dt - current.dt) < Math.abs(a.dt - current.dt) ? b : a))] : [];
     }
-    const isToday = i === 0;
 
     const temps = entries.map((e) => e.main.temp);
-    const min = Math.min(current.main.temp_min, ...entries.map((e) => e.main.temp_min));
-    const max = Math.max(current.main.temp_max, ...entries.map((e) => e.main.temp_max));
+    // The live observation only enriches Today. Mixing it into Tomorrow /
+    // Day After Tomorrow pinned their min/max to today's extremes.
+    const entryMins = entries.map((e) => e.main.temp_min);
+    const entryMaxs = entries.map((e) => e.main.temp_max);
+    const min =
+      entries.length === 0
+        ? current.main.temp_min
+        : isToday
+          ? Math.min(current.main.temp_min, ...entryMins)
+          : Math.min(...entryMins);
+    const max =
+      entries.length === 0
+        ? current.main.temp_max
+        : isToday
+          ? Math.max(current.main.temp_max, ...entryMaxs)
+          : Math.max(...entryMaxs);
     const windiest = entries.reduce<OwmForecastEntry | null>((best, e) =>
       (e.wind?.speed ?? 0) > (best?.wind?.speed ?? -1) ? e : best, null);
     const dom = isToday && entries.length === 0

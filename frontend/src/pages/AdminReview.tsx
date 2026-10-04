@@ -17,6 +17,8 @@ import Loader from '../components/common/Loader';
 import AnalysisCard from '../components/workflow/AnalysisCard';
 import WorkflowTracker from '../components/workflow/WorkflowTracker';
 import { useGsapEntrance } from '../hooks/useGsapEntrance';
+import { setGlobalSearch } from '../store/slices/uiSlice';
+import { adminIssueFields, matchesQuery } from '../utils/issueSearch';
 
 const FILTERS = ['ALL', 'REPORTED', 'VERIFIED', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'REJECTED'] as const;
 
@@ -27,6 +29,8 @@ export default function AdminReview() {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('ALL');
   const [rejectReason, setRejectReason] = useState('');
   const [assigneeId, setAssigneeId] = useState('');
+  const globalSearch = useAppSelector((s) => s.ui.globalSearch);
+  const visibleQueue = queue.filter((x) => matchesQuery(globalSearch, adminIssueFields(x)));
   useGsapEntrance('.gs-in', [queue.length]);
 
   useEffect(() => {
@@ -101,6 +105,13 @@ export default function AdminReview() {
 
       {error && <p className="text-xs font-semibold px-3 py-2.5 rounded-xl bg-[#fde8e2] text-brand whitespace-pre-line">{error}</p>}
 
+      {globalSearch.trim() && (
+        <p className="text-xs font-semibold text-soft flex items-center gap-2 flex-wrap">
+          <span>Showing {visibleQueue.length} of {queue.length} for “{globalSearch.trim()}”</span>
+          <button onClick={() => dispatch(setGlobalSearch(''))} className="underline text-brand">Clear search</button>
+        </p>
+      )}
+
       <div className="grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-4 items-start">
         {/* Queue */}
         <div className="space-y-2">
@@ -110,8 +121,12 @@ export default function AdminReview() {
             <p className="text-sm text-soft border border-dashed border-line rounded-xl p-6 text-center">
               No {filter === 'ALL' ? '' : `${filter} `}issues right now.
             </p>
+          ) : visibleQueue.length === 0 ? (
+            <p className="text-sm text-soft border border-dashed border-line rounded-xl p-6 text-center">
+              No issues match “{globalSearch.trim()}” — try a name, “flood”, “heat” or a status like “verified”.
+            </p>
           ) : (
-            queue.map((q) => (
+            visibleQueue.map((q) => (
               <div
                 key={q.id}
                 onClick={() => open(q.id)}

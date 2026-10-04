@@ -102,7 +102,7 @@ export default function WeatherPage() {
             <div className={loading ? 'opacity-60 pointer-events-none' : ''}>
               <ThreeDayForecast forecast={forecast} timezoneOffset={timezoneOffset} />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-                <WeatherRiskCard today={forecast[0]!} />
+                <WeatherRiskCard today={forecast[forecast.length - 1]!} />
                 <TemperatureTrend forecast={forecast} />
               </div>
             </div>

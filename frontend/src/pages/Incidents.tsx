@@ -7,7 +7,8 @@ import { useGsapEntrance } from '../hooks/useGsapEntrance';
 
 export default function Incidents() {
   const dispatch = useAppDispatch();
-  const { items, loading, severityFilter, search } = useAppSelector((s) => s.incidents);
+  const { items, loading, severityFilter } = useAppSelector((s) => s.incidents);
+  const search = useAppSelector((s) => s.ui.globalSearch);
   useGsapEntrance('.gs-in', [items.length, severityFilter]);
 
   useEffect(() => { dispatch(fetchIncidents()); }, [dispatch]);
