@@ -632,7 +632,7 @@ Users cannot access another role's protected dashboard or actions.
 ## Frontend
 
 * React.js
-* JavaScript
+* TypeScript
 * Responsive Web UI
 
 ## Backend
