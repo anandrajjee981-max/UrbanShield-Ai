@@ -86,6 +86,25 @@ const envSchema = z.object({
   ISSUE_UPLOAD_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(20),
 
   /**
+   * Upper bound for one uploaded government identity document, enforced by multer
+   * before any byte is read from the socket.
+   *
+   * Slightly larger than the issue photo cap because government ID scans are
+   * frequently multi-page PDFs or phone photos at full camera resolution. Still
+   * small on purpose: this value bounds how much of a stranger's identity
+   * document the server will buffer in memory.
+   */
+  AUTHORITY_DOCUMENT_MAX_BYTES: z.coerce.number().int().positive().default(8 * 1024 * 1024),
+
+  /**
+   * How many authority applications one account may submit or re-submit per
+   * minute. An anti-spam ceiling only: a real candidate submits once, then
+   * perhaps once more after a rejection, so this is orders of magnitude above the
+   * genuine rate.
+   */
+  AUTHORITY_APPLICATION_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(10),
+
+  /**
    * Browser origin(s) allowed by CORS. Credentials (cookies) are enabled, so
    * this must be an explicit origin - `*` is rejected by the browser. Several
    * origins can be listed separated by commas, e.g. for staging deployments.

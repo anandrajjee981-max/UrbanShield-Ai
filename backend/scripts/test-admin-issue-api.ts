@@ -17,11 +17,8 @@
  *   - the one-way nature of both transitions (409 on a second attempt)
  *   - that the reviewer always comes from the cookie and never from the body
  *
- * ADMIN accounts cannot be created through the public registration endpoint
- * (`registerSchema` only accepts CITIZEN / AUTHORITY), so the admin is promoted
- * with a direct `UPDATE users SET role` and then logs in again to obtain an
- * ADMIN cookie. That single write is the only way this script touches the
- * database; everything after it goes through the HTTP API.
+ * ADMIN accounts are not publicly registerable, so the test provisions one
+ * directly in the database, then obtains an admin cookie through the API.
  *
  * Every request uses a unique email, so the script can be run repeatedly.
  */
@@ -229,8 +226,6 @@ const main = async (): Promise<void> => {
   let adminId = '';
 
   {
-    // Registered as a citizen, promoted with one direct SQL write, then logged in
-    // again so the cookie carries role ADMIN.
     const res = await admin.request('POST', '/api/auth/register', {
       name: 'Review Admin',
       email: adminEmail,
@@ -249,7 +244,7 @@ const main = async (): Promise<void> => {
     const user = asRecord(dataOf(res.json).user);
 
     check(
-      'admin session established after promotion (200)',
+      'admin session established after trusted promotion (200)',
       res.status === 200 && user.role === 'ADMIN',
       res.status,
       `role=${String(user.role)}`,

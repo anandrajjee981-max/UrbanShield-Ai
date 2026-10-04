@@ -1,13 +1,14 @@
 import { query } from '../config/db.js';
 import type {
-  AdminIssue,
-  AdminIssueRow,
+  AuthorityReviewIssue,
   CreateIssueData,
   Issue,
   IssueRow,
+  MonitoredIssue,
+  MonitoredIssueRow,
 } from '../models/issue.model.js';
-import { toAdminIssue, toIssue } from '../models/issue.model.js';
-import { ISSUE_STATUS_AFTER_ADMIN_ACTION, REVIEWABLE_ISSUE_STATUS } from '../types/issue.types.js';
+import { toAuthorityReviewIssue, toIssue, toMonitoredIssue } from '../models/issue.model.js';
+import { ISSUE_STATUS_AFTER_AUTHORITY_ACTION, REVIEWABLE_ISSUE_STATUS } from '../types/issue.types.js';
 import type { IssueStatus } from '../types/issue.types.js';
 import { InternalServerError } from '../utils/api-error.js';
 
@@ -21,26 +22,38 @@ import { InternalServerError } from '../utils/api-error.js';
  * Note what is *not* insertable from here: `id`, `status`, `created_at` and
  * `updated_at` are left to the column defaults, so a report is always created
  * as REPORTED and never with a caller supplied status.
+ *
+ * The review reads and the monitoring reads are separate statements on purpose.
+ * A verified authority sees the civic problem and nothing about the person who
+ * filed it (`ISSUE_REVIEW_COLUMNS`), while the admin monitoring view joins the
+ * reporter (`ISSUE_MONITORING_SELECT`) - it reads but never writes.
  */
 
 const ISSUE_COLUMNS =
   'id, user_id, issue_type, description, image_url, image_file_id, location_type, latitude, longitude, address, status, created_at, updated_at';
 
 /**
- * Columns needed by the admin review screen. The reviewer and citizen identities
- * stay as ids and are resolved through the `users` table; no name, email or
- * password hash is copied into `issues`.
+ * Every column of an issue including the authority review metadata, which is what
+ * the review writes must return.
+ *
+ * Note the absence of `user_id`: an authority never needs the reporter's account,
+ * so the review payload cannot leak it even if a mapping forgets to strip it. The
+ * citizen's own "My Reports" read uses `ISSUE_COLUMNS`, which does include it,
+ * because that query is filtered by it.
  */
-const ISSUE_ADMIN_COLUMNS =
-  'id, user_id, issue_type, description, image_url, image_file_id, location_type, latitude, longitude, address, status, verified_by, verified_at, rejected_by, rejected_at, rejection_reason, created_at, updated_at';
+const ISSUE_REVIEW_COLUMNS =
+  'id, issue_type, description, image_url, location_type, latitude, longitude, address, status, verified_by, verified_at, rejected_by, rejected_at, rejection_reason, created_at, updated_at';
 
 /**
- * Every column the admin payload needs, including the joined citizen name and
- * email. `password_hash` is deliberately absent from the select list.
+ * The admin monitoring read, joined to `users` for the account that filed the
+ * report.
+ *
+ * `password_hash` is deliberately absent from the select list, and the mapping
+ * (`toMonitoredIssue`) has no field that could carry it.
  */
-const ADMIN_ISSUE_SELECT = `
-  SELECT i.id, i.user_id, i.issue_type, i.description, i.image_url, i.image_file_id,
-         i.location_type, i.latitude, i.longitude, i.address, i.status,
+const ISSUE_MONITORING_SELECT = `
+  SELECT i.id, i.issue_type, i.description, i.image_url, i.location_type,
+         i.latitude, i.longitude, i.address, i.status,
          i.verified_by, i.verified_at, i.rejected_by, i.rejected_at, i.rejection_reason,
          i.created_at, i.updated_at,
          u.name AS citizen_name, u.email AS citizen_email
@@ -99,31 +112,32 @@ export const findIssuesByUserId = async (userId: string, limit: number): Promise
 };
 
 /**
- * Every reported issue for the admin dashboard, newest first, optionally narrowed
- * to one status.
+ * Every reported issue for the admin monitoring view, newest first, optionally
+ * narrowed to one status.
  *
- * The optional status filter is a parameter, never concatenated SQL text, so the
- * caller cannot inject a condition. An absent filter lists every status.
+ * Read-only by construction: no admin-owned write exists in this module. The
+ * status filter is a parameter, never concatenated SQL text, so a caller cannot
+ * inject a condition. An absent filter lists every status.
  */
-export const findAllIssues = async (status: IssueStatus | null, limit: number): Promise<AdminIssue[]> => {
-  const { rows } = await query<AdminIssueRow>(
-    `${ADMIN_ISSUE_SELECT}
+export const findIssuesForMonitoring = async (status: IssueStatus | null, limit: number): Promise<MonitoredIssue[]> => {
+  const { rows } = await query<MonitoredIssueRow>(
+    `${ISSUE_MONITORING_SELECT}
      WHERE $1::text IS NULL OR i.status = $1::text
      ORDER BY i.created_at DESC
      LIMIT $2`,
     [status, limit],
   );
 
-  return rows.map(toAdminIssue);
+  return rows.map(toMonitoredIssue);
 };
 
 /**
- * One issue with the joined citizen, for the admin review screen. Returns null
+ * One issue with the joined reporter, for the admin monitoring view. Returns null
  * when the id does not exist so the service can turn that into a 404.
  */
-export const findAdminIssueById = async (id: string): Promise<AdminIssue | null> => {
-  const { rows } = await query<AdminIssueRow>(
-    `${ADMIN_ISSUE_SELECT}
+export const findMonitoredIssueById = async (id: string): Promise<MonitoredIssue | null> => {
+  const { rows } = await query<MonitoredIssueRow>(
+    `${ISSUE_MONITORING_SELECT}
      WHERE i.id = $1
      LIMIT 1`,
     [id],
@@ -131,7 +145,49 @@ export const findAdminIssueById = async (id: string): Promise<AdminIssue | null>
 
   const row = rows[0];
 
-  return row ? toAdminIssue(row) : null;
+  return row ? toMonitoredIssue(row) : null;
+};
+
+/**
+ * Issues for the authority review queue, newest first, optionally narrowed to one
+ * status. Without a status this is exactly the "Pending Issues" list an authority
+ * dashboard shows - every REPORTED issue, with nobody assigned in particular,
+ * because assignment is a later module.
+ */
+export const findIssuesForAuthorityReview = async (
+  status: IssueStatus | null,
+  limit: number,
+): Promise<AuthorityReviewIssue[]> => {
+  const { rows } = await query<IssueRow>(
+    `SELECT ${ISSUE_REVIEW_COLUMNS}
+     FROM issues
+     WHERE $1::text IS NULL OR status = $1::text
+     ORDER BY created_at DESC
+     LIMIT $2`,
+    [status, limit],
+  );
+
+  return rows.map(toAuthorityReviewIssue);
+};
+
+/**
+ * One issue for the authority review screen, or null when the id does not exist,
+ * so the service can turn that into a 404.
+ *
+ * Unfiltered by status on purpose: an already reviewed issue must still be
+ * openable, only the *transition* is restricted.
+ */
+export const findAuthorityReviewIssueById = async (id: string): Promise<AuthorityReviewIssue | null> => {
+  const { rows } = await query<IssueRow>(
+    `SELECT ${ISSUE_REVIEW_COLUMNS}
+     FROM issues
+     WHERE id = $1
+     LIMIT 1`,
+    [id],
+  );
+  const row = rows[0];
+
+  return row ? toAuthorityReviewIssue(row) : null;
 };
 
 /**
@@ -141,67 +197,62 @@ export const findAdminIssueById = async (id: string): Promise<AdminIssue | null>
  *  - `status = $3` in the WHERE clause. The transition target is supplied as a
  *    parameter and the source status is the single REVIEWABLE_ISSUE_STATUS
  *    constant, so an already reviewed issue can never be overwritten - even if
- *    two admins press the button at the same moment. The service turns "no row
- *    updated" into a 409.
+ *    two authorities press the button at the same moment. The service turns "no
+ *    row updated" into a 409.
  *  - `verified_by` / `verified_at` come from the caller, which is the
- *    authenticated admin id. They are never read from the request body.
+ *    authenticated authority id. They are never read from the request body.
  *
- * The update and the citizen join run in one statement through a CTE, so the
- * returned row is the reviewed issue with its new status and cannot be a stale
- * read from between the two queries.
+ * The reviewer is not re-checked for its authority standing here on purpose: that
+ * is settled once, at the route (`requireRole('AUTHORITY')` +
+ * `requireVerifiedAuthority()`), and a second check in SQL would only be another
+ * place to keep in sync.
  */
-export const verifyIssue = async (id: string, adminId: string): Promise<AdminIssue | null> => {
-  const { rows } = await query<AdminIssueRow>(
-    `WITH reviewed AS (
-       UPDATE issues
-          SET status = $3,
-              verified_by = $2,
-              verified_at = NOW()
-        WHERE id = $1
-          AND status = $4
-        RETURNING ${ISSUE_ADMIN_COLUMNS}
-     )
-     SELECT reviewed.*, u.name AS citizen_name, u.email AS citizen_email
-     FROM reviewed
-     JOIN users u ON u.id = reviewed.user_id`,
-    [id, adminId, ISSUE_STATUS_AFTER_ADMIN_ACTION.VERIFY, REVIEWABLE_ISSUE_STATUS],
+export const verifyIssue = async (id: string, authorityId: string): Promise<AuthorityReviewIssue | null> => {
+  const { rows } = await query<IssueRow>(
+    `UPDATE issues
+        SET status = $3,
+            verified_by = $2,
+            verified_at = NOW()
+      WHERE id = $1
+        AND status = $4
+      RETURNING ${ISSUE_REVIEW_COLUMNS}`,
+    [id, authorityId, ISSUE_STATUS_AFTER_AUTHORITY_ACTION.VERIFY, REVIEWABLE_ISSUE_STATUS],
   );
 
   const row = rows[0];
 
-  return row ? toAdminIssue(row) : null;
+  return row ? toAuthorityReviewIssue(row) : null;
 };
 
 /**
  * Moves a REPORTED issue to REJECTED, storing the optional reason in its own
- * column (never appended to `description`) plus the rejecting admin and the
+ * column (never appended to `description`) plus the rejecting authority and the
  * timestamp.
  *
  * `rejection_reason = COALESCE($5, rejection_reason)` leaves the column null when
  * no reason is sent, and the same `status = $4` guard as `verifyIssue` keeps the
  * transition one-way.
  */
-export const rejectIssue = async (id: string, adminId: string, reason: string | null): Promise<AdminIssue | null> => {
-  const { rows } = await query<AdminIssueRow>(
-    `WITH reviewed AS (
-       UPDATE issues
-          SET status = $3,
-              rejected_by = $2,
-              rejected_at = NOW(),
-              rejection_reason = COALESCE($5, rejection_reason)
-        WHERE id = $1
-          AND status = $4
-        RETURNING ${ISSUE_ADMIN_COLUMNS}
-     )
-     SELECT reviewed.*, u.name AS citizen_name, u.email AS citizen_email
-     FROM reviewed
-     JOIN users u ON u.id = reviewed.user_id`,
-    [id, adminId, ISSUE_STATUS_AFTER_ADMIN_ACTION.REJECT, REVIEWABLE_ISSUE_STATUS, reason],
+export const rejectIssue = async (
+  id: string,
+  authorityId: string,
+  reason: string | null,
+): Promise<AuthorityReviewIssue | null> => {
+  const { rows } = await query<IssueRow>(
+    `UPDATE issues
+        SET status = $3,
+            rejected_by = $2,
+            rejected_at = NOW(),
+            rejection_reason = COALESCE($5, rejection_reason)
+      WHERE id = $1
+        AND status = $4
+      RETURNING ${ISSUE_REVIEW_COLUMNS}`,
+    [id, authorityId, ISSUE_STATUS_AFTER_AUTHORITY_ACTION.REJECT, REVIEWABLE_ISSUE_STATUS, reason],
   );
 
   const row = rows[0];
 
-  return row ? toAdminIssue(row) : null;
+  return row ? toAuthorityReviewIssue(row) : null;
 };
 
 export const deleteIssue = async (id: string): Promise<void> => {
