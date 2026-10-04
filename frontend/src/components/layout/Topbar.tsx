@@ -1,7 +1,7 @@
 import { Bell, Menu, Search, LogOut, Sun, Moon } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { toggleMobileMenu, toggleSidebar, toggleTheme } from '../../store/slices/uiSlice';
+import { setGlobalSearch, toggleMobileMenu, toggleSidebar, toggleTheme } from '../../store/slices/uiSlice';
 import { togglePanel } from '../../store/slices/notificationsSlice';
 import { logoutThunk } from '../../store/slices/authSlice';
 
@@ -11,7 +11,20 @@ export default function Topbar({ onSearch }: { onSearch?: (q: string) => void })
   const unread = useAppSelector((s) => s.notifications.items.filter((n) => !n.read).length);
   const user = useAppSelector((s) => s.auth.user);
   const theme = useAppSelector((s) => s.ui.theme);
+  const globalSearch = useAppSelector((s) => s.ui.globalSearch);
   const initials = (user?.name ?? 'U').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+  const location = useLocation();
+  const goToResults = () => {
+    // Empty query → stay on the current page (its list already shows
+    // everything unfiltered). Never redirect on an empty search.
+    if (globalSearch.trim() === '') return;
+    // Already on the results page → stay; the live filter applies in place.
+    const to = user?.role === 'AUTHORITY' ? '/tasks' : user?.role === 'ADMIN' ? '/admin' : '/reports';
+    if (location.pathname === to) return;
+    // From pages without a filterable list (e.g. Dashboard), jump to
+    // the role's results page — the query travels via globalSearch.
+    navigate(to);
+  };
   const handleLogout = () => {
     // Navigate FIRST while still authenticated: '/' is a public route, so
     // ProtectedRoute unmounts. Then clearing the session cannot trigger its
@@ -25,10 +38,17 @@ export default function Topbar({ onSearch }: { onSearch?: (q: string) => void })
       <button className="lg:hidden p-2 rounded-lg hover:bg-canvas shrink-0" onClick={() => dispatch(toggleMobileMenu())}><Menu size={20} /></button>
       <button className="hidden lg:block p-2 rounded-lg hover:bg-canvas shrink-0" onClick={() => dispatch(toggleSidebar())}><Menu size={20} /></button>
       {/* Full-width second row on phones, inline on sm+ */}
-      <div className="flex items-center gap-2 bg-canvas border border-line rounded-xl px-3 py-2 order-3 basis-full sm:order-none sm:basis-auto sm:flex-1 sm:min-w-0 sm:max-w-md min-w-0">
+      <div className="flex items-center gap-2 bg-canvas border border-line rounded-xl pl-3 pr-1.5 py-1.5 order-3 basis-full sm:order-none sm:basis-auto sm:flex-1 sm:min-w-0 sm:max-w-md min-w-0">
         <Search size={16} className="text-mute shrink-0" />
-        <input placeholder="Search incidents, zones, reports…" className="bg-transparent outline-none text-sm w-full min-w-0"
-          onChange={(e) => onSearch?.(e.target.value)} />
+        <input placeholder="Search issues, reports, people…" className="bg-transparent outline-none text-sm w-full min-w-0"
+          title="Type to filter the current list — press Enter or tap Search to jump to your results page"
+          value={globalSearch}
+          onChange={(e) => { dispatch(setGlobalSearch(e.target.value)); onSearch?.(e.target.value); }}
+          onKeyDown={(e) => { if (e.key === 'Enter') goToResults(); }} />
+        <button onClick={goToResults} title="Search"
+          className="shrink-0 w-8 h-8 rounded-lg bg-brand text-white flex items-center justify-center hover:bg-brand-warm transition-all duration-150 active:scale-90">
+          <Search size={15} />
+        </button>
       </div>
       <div className="ml-auto flex items-center gap-1 sm:gap-2">
         <span className="hidden md:inline-flex text-xs font-semibold px-2.5 py-1.5 rounded-full bg-brand-soft text-brand">● LIVE CITY FEED</span>
@@ -41,7 +61,7 @@ export default function Topbar({ onSearch }: { onSearch?: (q: string) => void })
           {unread > 0 && <span className="absolute -top-0.5 -right-0.5 bg-brand text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{unread}</span>}
         </button>
         {user && (
-          <span className={`hidden sm:inline-flex text-[11px] font-bold px-2.5 py-1 rounded-full ${user.role === 'AUTHORITY' ? 'bg-[#e8efff] text-[#4482ea]' : 'bg-[#fff1e6] text-[#f84424]'}`}>
+          <span className={`hidden sm:inline-flex text-[11px] font-bold px-2.5 py-1 rounded-full ${user.role === 'AUTHORITY' ? 'bg-[#e8efff] text-[#4482ea]' : user.role === 'ADMIN' ? 'bg-[#e9f2e2] text-[#51933a]' : 'bg-[#fff1e6] text-[#f84424]'}`}>
             {user.role}
           </span>
         )}

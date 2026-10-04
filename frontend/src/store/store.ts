@@ -7,9 +7,11 @@ import map from './slices/mapSlice';
 import analytics from './slices/analyticsSlice';
 import notifications from './slices/notificationsSlice';
 import ui from './slices/uiSlice';
+import weather from './slices/weatherSlice';
+import workflow from './slices/workflowSlice';
 
 export const store = configureStore({
-  reducer: { auth, dashboard, incidents, reports, map, analytics, notifications, ui },
+  reducer: { auth, dashboard, incidents, reports, map, analytics, notifications, ui, weather, workflow },
 });
 
 export type RootState = ReturnType<typeof store.getState>;

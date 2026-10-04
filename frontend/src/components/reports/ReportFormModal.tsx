@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, MapPin, LocateFixed, ImagePlus, Trash2, CheckCircle2 } from 'lucide-react';
+import { X, MapPin, LocateFixed, ImagePlus, Trash2, CheckCircle2, Camera, RefreshCcw } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { submitReport } from '../../store/slices/reportsSlice';
 import { getCurrentPosition } from '../../services/mapService';
@@ -32,6 +32,11 @@ export default function ReportFormModal({ onClose }: { onClose: (newId?: string)
   const [error, setError] = useState('');
   const [doneId, setDoneId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Live camera capture state.
+  const [cameraOn, setCameraOn] = useState(false);
+  const [cameraStarting, setCameraStarting] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     popIn('.report-modal');
@@ -43,6 +48,73 @@ export default function ReportFormModal({ onClose }: { onClose: (newId?: string)
   useEffect(() => () => {
     if (photoPreview) URL.revokeObjectURL(photoPreview);
   }, [photoPreview]);
+
+  const stopCamera = () => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraOn(false);
+  };
+
+  // Always release the camera when the modal unmounts.
+  useEffect(() => () => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+  }, []);
+
+  /** Attach the live stream to the <video> once it is rendered. */
+  useEffect(() => {
+    if (cameraOn && streamRef.current && videoRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(() => { /* autoplay blocked — user can tap play */ });
+    }
+  }, [cameraOn]);
+
+  const startCamera = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('Live camera is not supported in this browser. Please upload a photo instead.');
+      return;
+    }
+    setError('');
+    setCameraStarting(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false,
+      });
+      streamRef.current = stream;
+      setCameraOn(true);
+    } catch {
+      setError('Could not open the camera. Allow camera permission (needs HTTPS or localhost), or upload a photo instead.');
+    } finally {
+      setCameraStarting(false);
+    }
+  };
+
+  /** Grab the current video frame → JPEG file → same upload path as gallery. */
+  const capturePhoto = () => {
+    const video = videoRef.current;
+    if (!video || video.videoWidth === 0) {
+      setError('Camera is not ready yet — wait a second and retry.');
+      return;
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d')?.drawImage(video, 0, 0);
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          setError('Could not capture the photo — please retry.');
+          return;
+        }
+        stopCamera();
+        onPhoto(new File([blob], `live-photo-${Date.now()}.jpg`, { type: 'image/jpeg' }));
+      },
+      'image/jpeg',
+      0.85,
+    );
+  };
 
   const useLocation = async () => {
     setLocating(true);
@@ -192,11 +264,42 @@ export default function ReportFormModal({ onClose }: { onClose: (newId?: string)
                     <Trash2 size={15} />
                   </button>
                 </div>
+              ) : cameraOn ? (
+                <div className="mt-1.5 space-y-2">
+                  <div className="relative">
+                    <video ref={videoRef} playsInline muted autoPlay
+                      className="w-full h-56 object-cover rounded-xl border border-line bg-black" />
+                    <span className="absolute top-2 left-2 text-[10px] font-bold px-2 py-1 rounded-full bg-black/60 text-white flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" /> LIVE
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={capturePhoto}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-xl bg-brand text-white hover:bg-brand-warm">
+                      <Camera size={16} /> Capture photo
+                    </button>
+                    <button type="button" onClick={stopCamera}
+                      className="flex items-center justify-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-xl border border-line bg-canvas hover:border-brand">
+                      <X size={15} /> Cancel
+                    </button>
+                  </div>
+                </div>
               ) : (
-                <button type="button" onClick={() => fileRef.current?.click()}
-                  className="mt-1.5 w-full flex items-center justify-center gap-2 border-2 border-dashed border-line rounded-xl py-5 text-sm font-semibold text-mute hover:border-tag hover:text-civic-amber-dark">
-                  <ImagePlus size={18} /> Add a photo
-                </button>
+                <div className="grid grid-cols-2 gap-2 mt-1.5">
+                  <button type="button" onClick={() => fileRef.current?.click()}
+                    className="flex items-center justify-center gap-2 border-2 border-dashed border-line rounded-xl py-5 text-sm font-semibold text-mute hover:border-tag hover:text-civic-amber-dark">
+                    <ImagePlus size={18} /> Gallery
+                  </button>
+                  <button type="button" onClick={startCamera} disabled={cameraStarting}
+                    className="flex items-center justify-center gap-2 border-2 border-dashed border-line rounded-xl py-5 text-sm font-semibold text-mute hover:border-brand hover:text-brand disabled:opacity-60">
+                    {cameraStarting ? (
+                      <RefreshCcw size={18} className="animate-spin" />
+                    ) : (
+                      <Camera size={18} />
+                    )}
+                    {cameraStarting ? 'Opening…' : 'Live photo'}
+                  </button>
+                </div>
               )}
             </div>
 

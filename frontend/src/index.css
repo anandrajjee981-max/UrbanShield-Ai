@@ -86,6 +86,15 @@
 
 html, body, #root { height: 100%; }
 body { margin: 0; background: var(--canvas); color: var(--ink); font-family: ui-sans-serif, system-ui, sans-serif; }
+
+/* Pointer cursor on every clickable element project-wide. */
+button:not(:disabled),
+a,
+[role="button"],
+input[type="submit"],
+label[for] { cursor: pointer; }
+button:disabled,
+a[aria-disabled="true"] { cursor: not-allowed; }
 .leaflet-container { z-index: 0; font-family: inherit; }
 
 /* Dark-mode tuning for third-party surfaces */
@@ -94,3 +103,118 @@ body { margin: 0; background: var(--canvas); color: var(--ink); font-family: ui-
 .dark .leaflet-popup-tip { background: #2a2114; color: #f2e7cf; }
 .dark .recharts-default-tooltip { background: #2a2114 !important; border: 1px solid #4c3f27 !important; }
 .dark .recharts-tooltip-label { color: #f2e7cf !important; }
+
+/* ── UrbanShieldAI brand loader (radar shield) ─────────────────────────── */
+.us-loader-radar {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.us-loader-core {
+  position: relative;
+  z-index: 2;
+  width: 76px;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand), var(--brand-warm));
+  box-shadow: 0 8px 28px -6px var(--brand);
+  animation: us-core-breathe 2.2s ease-in-out infinite;
+}
+.us-loader-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid var(--brand);
+  opacity: 0;
+  animation: us-ring-expand 2.2s ease-out infinite;
+}
+.us-loader-ring-2 { animation-delay: 0.7s; }
+.us-loader-ring-3 { animation-delay: 1.4s; }
+.us-loader-sweep {
+  position: absolute;
+  inset: 6px;
+  z-index: 1;
+  border-radius: 9999px;
+  background: conic-gradient(from 0deg, color-mix(in srgb, var(--brand) 55%, transparent), transparent 28%);
+  animation: us-spin 1.8s linear infinite;
+  -webkit-mask: radial-gradient(circle, transparent 34px, #000 35px);
+  mask: radial-gradient(circle, transparent 34px, #000 35px);
+}
+.us-loader-orbit {
+  position: absolute;
+  inset: -6px;
+  z-index: 1;
+  animation: us-spin 3.2s linear infinite reverse;
+}
+.us-loader-dot {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 9999px;
+  background: var(--blue);
+  box-shadow: 0 0 10px 2px color-mix(in srgb, var(--blue) 60%, transparent);
+}
+.us-loader-word {
+  background: linear-gradient(100deg, var(--ink) 30%, var(--brand) 50%, var(--ink) 70%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: us-shimmer 2.4s linear infinite;
+}
+.us-loader-word .text-brand { color: var(--brand); -webkit-text-fill-color: var(--brand); }
+.us-loader-status { animation: us-fade-slide 0.45s ease both; min-height: 1.5rem; }
+.us-loader-bar { position: relative; }
+.us-loader-bar-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, var(--brand), var(--brand-warm));
+  animation: us-bar-slide 1.3s ease-in-out infinite;
+}
+@keyframes us-ring-expand {
+  0% { transform: scale(0.55); opacity: 0.7; }
+  100% { transform: scale(1.05); opacity: 0; }
+}
+@keyframes us-spin { to { transform: rotate(360deg); } }
+@keyframes us-core-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+@keyframes us-shimmer {
+  0% { background-position: 120% 0; }
+  100% { background-position: -120% 0; }
+}
+@keyframes us-fade-slide {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes us-bar-slide {
+  0% { left: -40%; }
+  100% { left: 100%; }
+}
+
+/* Boot splash (plain CSS mirror, shown before React mounts) */
+#boot-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fcf9f2;
+  transition: opacity 0.45s ease;
+}
+#boot-splash.hide { opacity: 0; pointer-events: none; }

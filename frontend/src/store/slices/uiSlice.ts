@@ -14,8 +14,8 @@ function initialTheme(): Theme {
   return 'light';
 }
 
-interface UiState { sidebarOpen: boolean; mobileMenuOpen: boolean; theme: Theme; }
-const initialState: UiState = { sidebarOpen: true, mobileMenuOpen: false, theme: initialTheme() };
+interface UiState { sidebarOpen: boolean; mobileMenuOpen: boolean; theme: Theme; globalSearch: string; }
+const initialState: UiState = { sidebarOpen: true, mobileMenuOpen: false, theme: initialTheme(), globalSearch: '' };
 
 const slice = createSlice({
   name: 'ui', initialState,
@@ -28,7 +28,9 @@ const slice = createSlice({
       s.theme = s.theme === 'light' ? 'dark' : 'light';
       try { localStorage.setItem(THEME_KEY, s.theme); } catch { /* ignore */ }
     },
+    /** Topbar global search — filters incidents, citizen reports and authority tasks. */
+    setGlobalSearch: (s, a: PayloadAction<string>) => { s.globalSearch = a.payload; },
   },
 });
-export const { toggleSidebar, toggleMobileMenu, closeMobileMenu, setSidebar, toggleTheme } = slice.actions;
+export const { toggleSidebar, toggleMobileMenu, closeMobileMenu, setSidebar, toggleTheme, setGlobalSearch } = slice.actions;
 export default slice.reducer;

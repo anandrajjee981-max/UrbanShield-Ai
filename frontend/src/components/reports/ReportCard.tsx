@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { ThumbsUp, MapPin, Trash2, Loader2 } from 'lucide-react';
 import Card from '../common/Card';
+import AnalysisCard from '../workflow/AnalysisCard';
+import WorkflowTracker from '../workflow/WorkflowTracker';
 import type { CitizenReport } from '../../types';
 
 const statusStyle: Record<string, string> = {
@@ -69,6 +71,24 @@ export default function ReportCard({
       <p className="text-xs text-soft mt-1 line-clamp-3 break-words">{report.description}</p>
       {report.imageUrl && (
         <img src={report.imageUrl} alt="Issue evidence" className="w-full h-36 object-cover rounded-xl border border-line mt-3" loading="lazy" />
+      )}
+      {report.rawStatus && (
+        <div className="mt-3">
+          <WorkflowTracker status={report.rawStatus} />
+        </div>
+      )}
+      {(report.skillRequired || report.complexity || report.effortHours !== null) && (
+        <div className="mt-2">
+          <AnalysisCard
+            skillRequired={report.skillRequired ?? null}
+            complexity={report.complexity ?? null}
+            effortHours={report.effortHours ?? null}
+            compact
+          />
+        </div>
+      )}
+      {report.resolutionNote && (
+        <p className="text-[11px] text-soft italic mt-2">“{report.resolutionNote}”</p>
       )}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 text-[11px] text-mute">
         <span className="flex items-center gap-1 min-w-0"><MapPin size={12} className="shrink-0" /><span className="truncate">{report.address}</span></span>
