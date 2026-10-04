@@ -38,7 +38,7 @@ export default function Reports() {
         <h1 className="text-xl sm:text-2xl font-extrabold">My Reports ({items.length})</h1>
         <button onClick={() => setFormOpen(true)} className="shrink-0 text-sm font-bold px-4 py-2.5 rounded-xl bg-brand text-white hover:bg-brand-warm">+ New Report</button>
       </div>
-      <p className="text-xs text-mute">Live from GET /api/issues/my — statuses map REPORTED→pending, VERIFIED→verified, REJECTED→rejected, RESOLVED→actioned.</p>
+      <p className="text-xs text-mute">Live from GET /api/issues/my — track REPORTED → VERIFIED → ASSIGNED → IN_PROGRESS → RESOLVED on each card.</p>
 
       {/* City map on top, report list below (phone-first stacking) */}
       <div ref={mapRef} className="scroll-mt-20">

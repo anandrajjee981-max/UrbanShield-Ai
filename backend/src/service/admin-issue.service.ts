@@ -172,3 +172,29 @@ export const rejectIssue = async (params: RejectIssueParams): Promise<AdminIssue
 
   return reviewIssue('REJECT', params, reason ?? null);
 };
+
+/**
+ * Permanently deletes a REJECTED issue (admin cleanup of invalid / spam
+ * reports from the queue).
+ *
+ * 404 when the id does not exist, 409 when the issue is in any other status:
+ * only the terminal REJECTED branch may be removed, everything else carries
+ * a citizen-visible trail that must stay auditable.
+ */
+export const deleteRejectedIssue = async (issueId: string): Promise<{ id: string }> => {
+  const issue = await requireIssue(issueId);
+
+  if (issue.status !== 'REJECTED') {
+    throw new ConflictError('Only a REJECTED issue can be deleted.', 'ISSUE_NOT_DELETABLE');
+  }
+
+  const deleted = await issueDao.deleteRejectedIssue(issue.id);
+
+  if (!deleted) {
+    // Status moved between the read and the delete (should not happen for a
+    // terminal status, but reported the same way).
+    throw new ConflictError('Issue could not be deleted.', 'ISSUE_NOT_DELETABLE');
+  }
+
+  return { id: issue.id };
+};

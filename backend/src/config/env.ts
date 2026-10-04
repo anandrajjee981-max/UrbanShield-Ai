@@ -73,6 +73,21 @@ const envSchema = z.object({
   ISSUE_IMAGE_MAX_BYTES: z.coerce.number().int().positive().default(5 * 1024 * 1024),
 
   /**
+   * OpenWeatherMap API key for the public weather feature
+   * (GET /api/weather). Optional so the app still boots without it - the
+   * weather endpoint answers 503 WEATHER_NOT_CONFIGURED until a key is set.
+   * The key never leaves the server: the frontend only talks to /api/weather.
+   */
+  OPENWEATHER_API_KEY: z
+    .string()
+    .trim()
+    .min(1, 'OPENWEATHER_API_KEY must not be blank')
+    .optional(),
+
+  /** How many weather lookups one IP may make per minute (each may hit OpenWeatherMap). */
+  WEATHER_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(30),
+
+  /**
    * How many issues one authenticated citizen may report per minute. Anti spam
    * only: a burst well above what a real complaint session needs.
    */

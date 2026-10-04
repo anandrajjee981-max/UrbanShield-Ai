@@ -7,3 +7,5 @@ export function useGsapEntrance(selector = '.gs-in', deps: unknown[] = []) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 }
+
+

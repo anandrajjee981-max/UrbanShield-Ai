@@ -6,7 +6,9 @@ import { env, FRONTEND_ORIGINS } from './config/env.js';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware.js';
 import authRoutes from './routes/auth.routes.js';
 import adminIssueRoutes from './routes/admin-issue.routes.js';
+import authorityIssueRoutes from './routes/authority-issue.routes.js';
 import issueRoutes from './routes/issue.routes.js';
+import weatherRoutes from './routes/weather.routes.js';
 import { sendSuccess } from './utils/api-response.js';
 import { logger } from './utils/logger.js';
 
@@ -65,8 +67,12 @@ export const createApp = (): Express => {
 
   app.use('/api/auth', authRoutes);
   app.use('/api/issues', issueRoutes);
-  // Admin review of citizen reports: /api/admin/issues[/:issueId[/verify|/reject]]
+  // Admin review of citizen reports: /api/admin/issues[/:issueId[/verify|/reject|/analyze|/recommendation|/assign]]
   app.use('/api/admin/issues', adminIssueRoutes);
+  // Authority field work: /api/authority/issues[/:issueId[/start|/resolve]]
+  app.use('/api/authority/issues', authorityIssueRoutes);
+  // Public 3-day weather via OpenWeatherMap (key stays server side): /api/weather?city=..
+  app.use('/api/weather', weatherRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

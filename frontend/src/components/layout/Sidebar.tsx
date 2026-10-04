@@ -1,23 +1,27 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Map, AlertTriangle, FileText, BarChart3, Bot, Siren, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Map, AlertTriangle, FileText, BarChart3, Bot, Siren, ShieldCheck, ClipboardCheck, Briefcase } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { closeMobileMenu } from '../../store/slices/uiSlice';
 
 const links = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/map', label: 'City Map', icon: Map },
-  { to: '/incidents', label: 'Incidents', icon: AlertTriangle },
-  { to: '/reports', label: 'Reports', icon: FileText },
-  { to: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { to: '/ai', label: 'AI Insights', icon: Bot },
-  { to: '/emergency', label: 'Emergency', icon: Siren },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] as const },
+  { to: '/map', label: 'City Map', icon: Map, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] as const },
+  { to: '/incidents', label: 'Incidents', icon: AlertTriangle, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] as const },
+  { to: '/reports', label: 'Reports', icon: FileText, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] as const },
+  { to: '/admin', label: 'Admin Review', icon: ClipboardCheck, roles: ['ADMIN'] as const },
+  { to: '/tasks', label: 'My Tasks', icon: Briefcase, roles: ['AUTHORITY'] as const },
+  { to: '/analytics', label: 'Analytics', icon: BarChart3, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] as const },
+  { to: '/ai', label: 'AI Insights', icon: Bot, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] as const },
+  { to: '/emergency', label: 'Emergency', icon: Siren, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] as const },
 ];
 
 export default function Sidebar() {
   const dispatch = useAppDispatch();
   const open = useAppSelector((s) => s.ui.sidebarOpen);
   const mobile = useAppSelector((s) => s.ui.mobileMenuOpen);
+  const role = useAppSelector((s) => s.auth.user?.role ?? 'CITIZEN');
   const close = () => dispatch(closeMobileMenu());
+  const visible = links.filter((l) => (l.roles as readonly string[]).includes(role));
   return (
     <>
       {/* Backdrop: tap outside the drawer to close it (mobile/tablet only) */}
@@ -34,14 +38,14 @@ export default function Sidebar() {
           {(open || mobile) && <div className="min-w-0"><p className="font-bold leading-none truncate">UrbanShieldAI</p><p className="text-[11px] text-slate-400">City Resilience</p></div>}
         </div>
         <nav className="p-3 space-y-1 flex-1 overflow-y-auto">
-          {links.map((l) => (
+          {visible.map((l) => (
             <NavLink key={l.to} to={l.to} end={l.end} onClick={close}
               className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${isActive ? 'bg-brand text-white' : 'text-slate-300 hover:bg-white/10'}`}>
               <l.icon size={18} className="shrink-0" />{(open || mobile) && <span className="truncate">{l.label}</span>}
             </NavLink>
           ))}
         </nav>
-        {(open || mobile) && <div className="p-4 text-[11px] text-slate-400">Frontend-only build<br />API-ready mock layer</div>}
+        {(open || mobile) && <div className="p-4 text-[11px] text-slate-400">Live backend workflow<br />Report → Verify → Assign → Resolve</div>}
       </aside>
     </>
   );

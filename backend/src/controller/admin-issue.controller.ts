@@ -79,7 +79,17 @@ const rejectIssueHandler: RequestHandler<{ issueId: string }, unknown, RejectIss
   sendSuccess(res, 200, 'Issue rejected successfully', { issue });
 };
 
+/** DELETE /api/admin/issues/:issueId - removes a REJECTED issue from the queue. */
+const deleteIssueHandler = async (req: Request<{ issueId: string }>, res: Response): Promise<void> => {
+  requireAdmin(req);
+
+  const deleted = await adminIssueService.deleteRejectedIssue(req.params.issueId);
+
+  sendSuccess(res, 200, 'Issue deleted successfully', { deleted });
+};
+
 export const listIssues = asyncHandler(listIssuesHandler);
 export const getIssue = asyncHandler(getIssueHandler);
 export const verifyIssue = asyncHandler(verifyIssueHandler);
 export const rejectIssue = asyncHandler(rejectIssueHandler);
+export const deleteIssue = asyncHandler(deleteIssueHandler);

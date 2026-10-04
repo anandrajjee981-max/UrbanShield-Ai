@@ -41,7 +41,7 @@ export default function Topbar({ onSearch }: { onSearch?: (q: string) => void })
           {unread > 0 && <span className="absolute -top-0.5 -right-0.5 bg-brand text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{unread}</span>}
         </button>
         {user && (
-          <span className={`hidden sm:inline-flex text-[11px] font-bold px-2.5 py-1 rounded-full ${user.role === 'AUTHORITY' ? 'bg-[#e8efff] text-[#4482ea]' : 'bg-[#fff1e6] text-[#f84424]'}`}>
+          <span className={`hidden sm:inline-flex text-[11px] font-bold px-2.5 py-1 rounded-full ${user.role === 'AUTHORITY' ? 'bg-[#e8efff] text-[#4482ea]' : user.role === 'ADMIN' ? 'bg-[#e9f2e2] text-[#51933a]' : 'bg-[#fff1e6] text-[#f84424]'}`}>
             {user.role}
           </span>
         )}

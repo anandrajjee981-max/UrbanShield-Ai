@@ -121,6 +121,14 @@ export interface BackendSafeIssue {
   longitude: number | null;
   address: string | null;
   status: BackendIssueStatus;
+  skillRequired: string | null;
+  complexity: string | null;
+  effortHours: number | null;
+  aiAnalyzedAt: string | null;
+  assignedAt: string | null;
+  startedAt: string | null;
+  resolvedAt: string | null;
+  resolutionNote: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -132,6 +140,38 @@ export interface BackendAdminIssue extends BackendSafeIssue {
   rejectedBy: string | null;
   rejectedAt: string | null;
   rejectionReason: string | null;
+  assignedTo: string | null;
+  assignee: { name: string; email: string } | null;
+  assignedBy: string | null;
+}
+
+export interface WorkflowAnalysis {
+  skillRequired: string;
+  complexity: string;
+  effortHours: number;
+  analyzedAt: string;
+}
+
+export interface WorkforceMember {
+  id: string;
+  name: string;
+  email: string;
+  activeAssignments: number;
+  available: boolean;
+}
+
+export interface AssignmentCandidate {
+  authority: WorkforceMember;
+  score: number;
+  reason: string;
+}
+
+export interface AssignmentRecommendation {
+  issueId: string;
+  analysis: WorkflowAnalysis;
+  workforce: WorkforceMember[];
+  ranking: AssignmentCandidate[];
+  recommendedAuthorityId: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -219,7 +259,7 @@ export async function createIssueRequest(
 // ---------------------------------------------------------------------------
 
 export async function adminListIssuesRequest(params?: {
-  status?: 'REPORTED' | 'VERIFIED' | 'REJECTED';
+  status?: 'REPORTED' | 'VERIFIED' | 'REJECTED' | 'ASSIGNED' | 'IN_PROGRESS' | 'RESOLVED';
   limit?: number;
 }): Promise<BackendAdminIssue[]> {
   const res = await api.get<ApiSuccess<{ issues: BackendAdminIssue[] }>>('/admin/issues', {
@@ -252,6 +292,12 @@ export async function adminRejectIssueRequest(
   return res.data.data.issue;
 }
 
+/** Permanently removes a REJECTED issue (ADMIN cleanup). */
+export async function deleteRejectedIssueRequest(issueId: string): Promise<{ id: string }> {
+  const res = await api.delete<ApiSuccess<{ deleted: { id: string } }>>(`/admin/issues/${issueId}`);
+  return res.data.data.deleted;
+}
+
 export async function checkBackendHealth(): Promise<boolean> {
   try {
     // /health lives on the server root, not under /api
@@ -262,4 +308,73 @@ export async function checkBackendHealth(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Admin assignment workflow — VERIFIED -> (AI analysis + recommendation) -> ASSIGNED
+// ---------------------------------------------------------------------------
+
+export async function analyzeIssueRequest(issueId: string): Promise<BackendAdminIssue> {
+  const res = await api.post<ApiSuccess<{ issue: BackendAdminIssue }>>(
+    `/admin/issues/${issueId}/analyze`,
+    {},
+  );
+  return res.data.data.issue;
+}
+
+export async function recommendAssignmentRequest(issueId: string): Promise<AssignmentRecommendation> {
+  const res = await api.get<ApiSuccess<{ recommendation: AssignmentRecommendation }>>(
+    `/admin/issues/${issueId}/recommendation`,
+  );
+  return res.data.data.recommendation;
+}
+
+export async function assignIssueRequest(issueId: string, authorityId: string): Promise<BackendAdminIssue> {
+  const res = await api.post<ApiSuccess<{ issue: BackendAdminIssue }>>(
+    `/admin/issues/${issueId}/assign`,
+    { authorityId },
+  );
+  return res.data.data.issue;
+}
+
+export async function fetchWorkforceRequest(): Promise<WorkforceMember[]> {
+  const res = await api.get<ApiSuccess<{ workforce: WorkforceMember[] }>>('/admin/issues/workforce');
+  return res.data.data.workforce;
+}
+
+// ---------------------------------------------------------------------------
+// Authority field workflow — ASSIGNED -> IN_PROGRESS -> RESOLVED
+// ---------------------------------------------------------------------------
+
+export async function fetchMyTasksRequest(): Promise<BackendSafeIssue[]> {
+  const res = await api.get<ApiSuccess<{ issues: BackendSafeIssue[] }>>('/authority/issues');
+  return res.data.data.issues;
+}
+
+/**
+ * Every citizen report on the city (read-only browse for AUTHORITY staff).
+ * Any issue a citizen reports appears here from REPORTED onwards, with the
+ * reporter and assignee context attached.
+ */
+export async function browseReportsRequest(status?: string): Promise<BackendAdminIssue[]> {
+  const res = await api.get<ApiSuccess<{ issues: BackendAdminIssue[] }>>('/authority/issues/browse', {
+    params: status ? { status } : undefined,
+  });
+  return res.data.data.issues;
+}
+
+export async function startTaskRequest(issueId: string): Promise<BackendSafeIssue> {
+  const res = await api.patch<ApiSuccess<{ issue: BackendSafeIssue }>>(
+    `/authority/issues/${issueId}/start`,
+    {},
+  );
+  return res.data.data.issue;
+}
+
+export async function resolveTaskRequest(issueId: string, note?: string): Promise<BackendSafeIssue> {
+  const res = await api.patch<ApiSuccess<{ issue: BackendSafeIssue }>>(
+    `/authority/issues/${issueId}/resolve`,
+    note ? { note } : {},
+  );
+  return res.data.data.issue;
 }

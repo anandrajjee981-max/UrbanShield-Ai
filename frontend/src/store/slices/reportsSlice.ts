@@ -83,6 +83,11 @@ export function backendIssueToReport(issue: BackendSafeIssue): CitizenReport {
     votes: 0,
     imageUrl: issue.imageUrl ?? undefined,
     locationType: issue.locationType,
+    rawStatus: issue.status,
+    skillRequired: issue.skillRequired,
+    complexity: issue.complexity,
+    effortHours: issue.effortHours,
+    resolutionNote: issue.resolutionNote,
   };
 }
 

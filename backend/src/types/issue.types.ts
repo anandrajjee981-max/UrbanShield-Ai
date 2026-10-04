@@ -90,14 +90,12 @@ export const isReviewedIssueStatus = (status: IssueStatus): status is ReviewedIs
   (REVIEWED_ISSUE_STATUSES as readonly IssueStatus[]).includes(status);
 
 /**
- * Statuses the admin dashboard can be filtered by: the pending queue plus the
- * two review outcomes. The later authority statuses are deliberately absent, so
- * `?status=` can never be used to probe a stage that has no API yet.
+ * Statuses the admin dashboard can be filtered by: every stage of the
+ * lifecycle, so the review queue (REPORTED), the assignment queue (VERIFIED),
+ * active work (ASSIGNED / IN_PROGRESS) and outcomes (REJECTED / RESOLVED) are
+ * all reachable. Unknown values are still a 400 via the Zod schema.
  */
-export const ADMIN_FILTERABLE_ISSUE_STATUSES = [
-  REVIEWABLE_ISSUE_STATUS,
-  ...REVIEWED_ISSUE_STATUSES,
-] as const;
+export const ADMIN_FILTERABLE_ISSUE_STATUSES = [...ISSUE_STATUSES] as const;
 
 export type AdminFilterableIssueStatus = (typeof ADMIN_FILTERABLE_ISSUE_STATUSES)[number];
 
@@ -111,3 +109,64 @@ export type AdminFilterableIssueStatus = (typeof ADMIN_FILTERABLE_ISSUE_STATUSES
 export const LOCATION_TYPES = ['GPS', 'MANUAL'] as const;
 
 export type LocationType = (typeof LOCATION_TYPES)[number];
+
+/**
+ * Skills the rule-based AI analysis can require for an issue.
+ * Kept in sync with the `issues_skill_required_valid` CHECK in
+ * 004_issue_ai_assignment.sql. AUTHORITY users are general response staff:
+ * the skill names the crew / equipment to dispatch, and the assignment
+ * recommendation ranks authorities by current availability for it.
+ */
+export const SKILL_REQUIRED_VALUES = [
+  'PLUMBING',
+  'ELECTRICAL',
+  'FLOOD_RESPONSE',
+  'HEAT_RESPONSE',
+  'DRAINAGE_CREW',
+  'SANITATION',
+  'GENERAL',
+] as const;
+
+export type SkillRequired = (typeof SKILL_REQUIRED_VALUES)[number];
+
+/** Complexity bands produced by the AI analysis step. */
+export const ISSUE_COMPLEXITIES = ['LOW', 'MEDIUM', 'HIGH'] as const;
+
+export type IssueComplexity = (typeof ISSUE_COMPLEXITIES)[number];
+
+/** Outcome of the AI analysis stage for one VERIFIED issue. */
+export interface IssueAnalysis {
+  skillRequired: SkillRequired;
+  complexity: IssueComplexity;
+  /** Estimated field effort in hours (0.5 steps, e.g. 2.5). */
+  effortHours: number;
+  analyzedAt: Date;
+}
+
+/** One AUTHORITY member with their current active workload. */
+export interface WorkforceMember {
+  id: string;
+  name: string;
+  email: string;
+  /** Issues currently ASSIGNED or IN_PROGRESS for this member. */
+  activeAssignments: number;
+  /** True when the member has no active assignment right now. */
+  available: boolean;
+}
+
+/** Ranked assignment candidate for a VERIFIED issue. */
+export interface AssignmentCandidate {
+  authority: WorkforceMember;
+  /** 0-100: higher means more suitable right now (availability first). */
+  score: number;
+  reason: string;
+}
+
+/** Full recommendation returned to the admin before assigning. */
+export interface AssignmentRecommendation {
+  issueId: string;
+  analysis: IssueAnalysis;
+  workforce: WorkforceMember[];
+  ranking: AssignmentCandidate[];
+  recommendedAuthorityId: string | null;
+}

@@ -1,4 +1,10 @@
-import type { IssueStatus, IssueType, LocationType } from '../types/issue.types.js';
+import type {
+  IssueComplexity,
+  IssueStatus,
+  IssueType,
+  LocationType,
+  SkillRequired,
+} from '../types/issue.types.js';
 
 /**
  * An `issues` row exactly as PostgreSQL returns it (snake_case columns).
@@ -23,6 +29,18 @@ export interface IssueRow {
   rejected_by: string | null;
   rejected_at: Date | null;
   rejection_reason: string | null;
+  /** AI analysis + assignment lifecycle (004_issue_ai_assignment.sql). */
+  skill_required: SkillRequired | null;
+  complexity: IssueComplexity | null;
+  /** NUMERIC arrives as a string, like latitude / longitude. */
+  effort_hours: string | null;
+  ai_analyzed_at: Date | null;
+  assigned_to: string | null;
+  assigned_by: string | null;
+  assigned_at: Date | null;
+  started_at: Date | null;
+  resolved_at: Date | null;
+  resolution_note: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -37,6 +55,8 @@ export interface IssueRow {
 export interface AdminIssueRow extends IssueRow {
   citizen_name: string;
   citizen_email: string;
+  assignee_name: string | null;
+  assignee_email: string | null;
 }
 
 /** Domain entity passed between DAO, service and controller. */
@@ -57,6 +77,16 @@ export interface Issue {
   rejectedBy: string | null;
   rejectedAt: Date | null;
   rejectionReason: string | null;
+  skillRequired: SkillRequired | null;
+  complexity: IssueComplexity | null;
+  effortHours: number | null;
+  aiAnalyzedAt: Date | null;
+  assignedTo: string | null;
+  assignedBy: string | null;
+  assignedAt: Date | null;
+  startedAt: Date | null;
+  resolvedAt: Date | null;
+  resolutionNote: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -77,6 +107,14 @@ export interface SafeIssue {
   longitude: number | null;
   address: string | null;
   status: IssueStatus;
+  skillRequired: SkillRequired | null;
+  complexity: IssueComplexity | null;
+  effortHours: number | null;
+  aiAnalyzedAt: Date | null;
+  assignedAt: Date | null;
+  startedAt: Date | null;
+  resolvedAt: Date | null;
+  resolutionNote: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -142,6 +180,17 @@ export interface AdminIssue {
   rejectedBy: string | null;
   rejectedAt: Date | null;
   rejectionReason: string | null;
+  skillRequired: SkillRequired | null;
+  complexity: IssueComplexity | null;
+  effortHours: number | null;
+  aiAnalyzedAt: Date | null;
+  assignedTo: string | null;
+  assignee: { name: string; email: string } | null;
+  assignedBy: string | null;
+  assignedAt: Date | null;
+  startedAt: Date | null;
+  resolvedAt: Date | null;
+  resolutionNote: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -164,6 +213,16 @@ export const toIssue = (row: IssueRow): Issue => ({
   rejectedBy: row.rejected_by,
   rejectedAt: row.rejected_at,
   rejectionReason: row.rejection_reason,
+  skillRequired: row.skill_required,
+  complexity: row.complexity,
+  effortHours: row.effort_hours === null ? null : Number(row.effort_hours),
+  aiAnalyzedAt: row.ai_analyzed_at,
+  assignedTo: row.assigned_to,
+  assignedBy: row.assigned_by,
+  assignedAt: row.assigned_at,
+  startedAt: row.started_at,
+  resolvedAt: row.resolved_at,
+  resolutionNote: row.resolution_note,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -188,6 +247,20 @@ export const toAdminIssue = (row: AdminIssueRow): AdminIssue => ({
   rejectedBy: row.rejected_by,
   rejectedAt: row.rejected_at,
   rejectionReason: row.rejection_reason,
+  skillRequired: row.skill_required,
+  complexity: row.complexity,
+  effortHours: row.effort_hours === null ? null : Number(row.effort_hours),
+  aiAnalyzedAt: row.ai_analyzed_at,
+  assignedTo: row.assigned_to,
+  assignee:
+    row.assignee_name !== null && row.assignee_email !== null
+      ? { name: row.assignee_name, email: row.assignee_email }
+      : null,
+  assignedBy: row.assigned_by,
+  assignedAt: row.assigned_at,
+  startedAt: row.started_at,
+  resolvedAt: row.resolved_at,
+  resolutionNote: row.resolution_note,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -207,6 +280,14 @@ export const toSafeIssue = (issue: Issue): SafeIssue => ({
   longitude: issue.longitude,
   address: issue.address,
   status: issue.status,
+  skillRequired: issue.skillRequired,
+  complexity: issue.complexity,
+  effortHours: issue.effortHours,
+  aiAnalyzedAt: issue.aiAnalyzedAt,
+  assignedAt: issue.assignedAt,
+  startedAt: issue.startedAt,
+  resolvedAt: issue.resolvedAt,
+  resolutionNote: issue.resolutionNote,
   createdAt: issue.createdAt,
   updatedAt: issue.updatedAt,
 });

@@ -1,13 +1,15 @@
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, Map, FileText, Bot, ArrowRight, Target, Eye, Users, Siren, Sun, Moon } from 'lucide-react';
+import { ShieldCheck, Map, FileText, Bot, ArrowRight, Target, Eye, Users, Siren, Sun, Moon, CloudSun } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { toggleTheme } from '../store/slices/uiSlice';
 import { useGsapEntrance } from '../hooks/useGsapEntrance';
+import WeatherPreviewCard from '../components/weather/WeatherPreviewCard';
 
 const features = [
-  { icon: Map, title: 'Live City Map', desc: 'Real OpenStreetMap tiles with incident markers, risk layers and location search.', color: '#4482ea' },
-  { icon: FileText, title: 'Citizen Reports', desc: 'Submit geo-tagged issues with photos. Verified reports get a civic-green badge.', color: '#51933a' },
-  { icon: Bot, title: 'AI Risk Insights', desc: 'Flood, heat and air-quality advisories to pre-deploy response teams.', color: '#965d13' },
+  { icon: Map, title: 'Live City Map', desc: 'Real OpenStreetMap tiles with incident markers, risk layers and location search.', color: '#4482ea', to: '/map' },
+  { icon: FileText, title: 'Citizen Reports', desc: 'Submit geo-tagged issues with photos. Verified reports get a civic-green badge.', color: '#51933a', to: '/reports' },
+  { icon: Bot, title: 'AI Risk Insights', desc: 'Flood, heat and air-quality advisories to pre-deploy response teams.', color: '#965d13', to: '/ai' },
+  { icon: CloudSun, title: '3-Day Weather', desc: 'Live temperature, rain risk and heat advisories for your city.', color: '#0e9594', to: '/weather', public: true },
 ];
 
 export default function Home() {
@@ -16,6 +18,14 @@ export default function Home() {
   const isAuthenticated = useAppSelector((s) => s.auth.isAuthenticated);
   const theme = useAppSelector((s) => s.ui.theme);
   useGsapEntrance('.gs-in', []);
+
+  // Click on a box → if logged in go straight to the page,
+  // else go to Login first and Login sends the user to that page after success.
+  // Public features (like Weather) open directly without login.
+  const openFeature = (to: string, isPublic = false) => {
+    if (isPublic || isAuthenticated) navigate(to);
+    else navigate('/login', { state: { from: to } });
+  };
 
   return (
     <div className="min-h-screen bg-canvas text-ink">
@@ -57,9 +67,9 @@ export default function Home() {
 
       <main className="px-5 md:px-10 py-10 md:py-16 max-w-5xl mx-auto">
         <div className="gs-in text-center">
-          <span className="inline-flex text-xs font-bold px-3 py-1.5 rounded-full bg-brand-soft text-brand">
+          {/* <span className="inline-flex text-xs font-bold px-3 py-1.5 rounded-full bg-brand-soft text-brand">
             ● FRONTEND DEMO · MOCK AUTH · NO BACKEND
-          </span>
+          </span> */}
           <h1 className="text-3xl md:text-5xl font-extrabold mt-4 leading-tight">
             One dashboard for a <span className="text-brand">safer city</span>
           </h1>
@@ -84,17 +94,32 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-4 mt-10">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-10">
           {features.map((f) => (
-            <div key={f.title} className="gs-in bg-card border border-line rounded-2xl p-5 shadow-sm">
+            <button
+              key={f.title}
+              type="button"
+              onClick={() => openFeature(f.to, 'public' in f && f.public)}
+              title={'public' in f && f.public ? `Open ${f.title}` : isAuthenticated ? `Open ${f.title}` : `Login to open ${f.title}`}
+              className="gs-in group bg-card border border-line rounded-2xl p-5 shadow-sm text-left cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:border-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+            >
               <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white" style={{ background: f.color }}>
                 <f.icon size={20} />
               </div>
-              <p className="font-bold mt-3">{f.title}</p>
+              <p className="font-bold mt-3 flex items-center justify-between gap-2">
+                {f.title}
+                <ArrowRight size={16} className="text-mute transition-transform duration-200 group-hover:translate-x-1 group-hover:text-brand" />
+              </p>
               <p className="text-sm text-soft mt-1">{f.desc}</p>
-            </div>
+              <p className="text-xs font-bold text-brand mt-3">
+                {'public' in f && f.public ? 'Open now →' : isAuthenticated ? 'Open now →' : 'Login to open →'}
+              </p>
+            </button>
           ))}
         </div>
+
+        {/* ── Live weather preview (public, links to /weather) ── */}
+        <WeatherPreviewCard />
 
         {/* ── About section (visible inside Home) ── */}
         <section id="about" className="gs-in mt-12 scroll-mt-20">

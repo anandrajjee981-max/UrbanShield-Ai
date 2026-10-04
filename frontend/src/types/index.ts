@@ -31,6 +31,13 @@ export interface CitizenReport {
   imageUrl?: string;
   /** How the location was provided (mirrors backend `locationType`). Only GPS reports are pinned on the map. */
   locationType?: 'GPS' | 'MANUAL';
+  /** Raw backend lifecycle status for the workflow tracker. */
+  rawStatus?: 'REPORTED' | 'VERIFIED' | 'REJECTED' | 'ASSIGNED' | 'IN_PROGRESS' | 'RESOLVED';
+  /** AI briefing once the issue is analysed (null until VERIFIED + analysed). */
+  skillRequired?: string | null;
+  complexity?: string | null;
+  effortHours?: number | null;
+  resolutionNote?: string | null;
 }
 
 export interface RiskZone {

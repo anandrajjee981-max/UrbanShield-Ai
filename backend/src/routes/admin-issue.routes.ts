@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import * as adminIssueController from '../controller/admin-issue.controller.js';
+import * as assignmentController from '../controller/assignment.controller.js';
 import { authenticate, requireRole } from '../middleware/auth.middleware.js';
 import { validateBody } from '../middleware/validate.middleware.js';
 import { rejectIssueSchema, verifyIssueSchema } from '../validation/admin-issue.schema.js';
+import { assignIssueSchema } from '../validation/workflow.schema.js';
 import type { UserRole } from '../types/auth.types.js';
 
 /**
@@ -31,6 +33,15 @@ const ADMIN_ONLY: UserRole[] = ['ADMIN'];
 
 adminIssueRouter.get('/', authenticate, requireRole(...ADMIN_ONLY), adminIssueController.listIssues);
 
+// Workforce availability for the assignment step. Registered before
+// `/:issueId` so "workforce" is not mistaken for an issue id.
+adminIssueRouter.get(
+  '/workforce',
+  authenticate,
+  requireRole(...ADMIN_ONLY),
+  assignmentController.workforce,
+);
+
 adminIssueRouter.get('/:issueId', authenticate, requireRole(...ADMIN_ONLY), adminIssueController.getIssue);
 
 adminIssueRouter.patch(
@@ -47,6 +58,33 @@ adminIssueRouter.patch(
   requireRole(...ADMIN_ONLY),
   validateBody(rejectIssueSchema),
   adminIssueController.rejectIssue,
+);
+
+// Cleanup of invalid / spam reports: only REJECTED issues can be removed,
+// every other status carries an auditable trail.
+adminIssueRouter.delete('/:issueId', authenticate, requireRole(...ADMIN_ONLY), adminIssueController.deleteIssue);
+
+// AI analysis + assignment workflow (VERIFIED -> ASSIGNED).
+adminIssueRouter.post(
+  '/:issueId/analyze',
+  authenticate,
+  requireRole(...ADMIN_ONLY),
+  assignmentController.analyze,
+);
+
+adminIssueRouter.get(
+  '/:issueId/recommendation',
+  authenticate,
+  requireRole(...ADMIN_ONLY),
+  assignmentController.recommendation,
+);
+
+adminIssueRouter.post(
+  '/:issueId/assign',
+  authenticate,
+  requireRole(...ADMIN_ONLY),
+  validateBody(assignIssueSchema),
+  assignmentController.assign,
 );
 
 export default adminIssueRouter;

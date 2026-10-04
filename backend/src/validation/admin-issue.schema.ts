@@ -34,24 +34,27 @@ export const issueIdSchema = z.uuid('Issue id must be a valid UUID');
 /**
  * `GET /api/admin/issues` query string.
  *
- * `status` is optional; without it the dashboard lists every reported issue,
- * newest first. The enum is deliberately narrower than ISSUE_STATUSES - only the
- * pending queue and the two admin outcomes - so an arbitrary value (or a
- * `?status=IN_PROGRESS` probe for a stage that has no API yet) is a 400.
+ * `status` is optional; without it the dashboard lists every issue, newest
+ * first. The enum covers the whole lifecycle (REPORTED queue, VERIFIED
+ * assignment queue, ASSIGNED / IN_PROGRESS active work, REJECTED / RESOLVED
+ * outcomes), so an arbitrary value is a 400.
  *
  * `.strict()` means an unknown query parameter is a validation error too, so a
  * typo such as `?states=REPORTED` cannot silently return the unfiltered list.
  */
 export const adminIssueListQuerySchema = z
   .object({
-    status: z.enum(ADMIN_FILTERABLE_ISSUE_STATUSES, {
-      error: `Status must be one of: ${ADMIN_FILTERABLE_ISSUE_STATUSES.join(', ')}`,
-    }),
+    status: z
+      .enum(ADMIN_FILTERABLE_ISSUE_STATUSES, {
+        error: `Status must be one of: ${ADMIN_FILTERABLE_ISSUE_STATUSES.join(', ')}`,
+      })
+      .optional(),
     limit: z.coerce
       .number({ error: 'Limit must be a number' })
       .int('Limit must be a whole number')
       .min(1, 'Limit must be at least 1')
-      .max(ADMIN_ISSUE_LIST_MAX_LIMIT, `Limit must be at most ${ADMIN_ISSUE_LIST_MAX_LIMIT}`),
+      .max(ADMIN_ISSUE_LIST_MAX_LIMIT, `Limit must be at most ${ADMIN_ISSUE_LIST_MAX_LIMIT}`)
+      .optional(),
   })
   .strict();
 
