@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { fetchReports } from '../store/slices/reportsSlice';
+import { deleteReport, fetchReports } from '../store/slices/reportsSlice';
 import ReportCard from '../components/reports/ReportCard';
 import ReportsMap from '../components/reports/ReportsMap';
 import ReportFormModal from '../components/reports/ReportFormModal';
@@ -10,7 +10,7 @@ import { useGsapEntrance } from '../hooks/useGsapEntrance';
 
 export default function Reports() {
   const dispatch = useAppDispatch();
-  const { items, loading, error } = useAppSelector((s) => s.reports);
+  const { items, loading, error, deletingId } = useAppSelector((s) => s.reports);
   const [formOpen, setFormOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -28,6 +28,17 @@ export default function Reports() {
     setSelectedId((prev) => (prev === id ? null : id));
     if (window.innerWidth < 640) {
       mapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  /** Confirmed delete → DELETE /api/issues/:id, then drop the row from the list + map. */
+  const handleDelete = async (id: string) => {
+    const res = await dispatch(deleteReport(id));
+    setSelectedId((prev) => (prev === id ? null : prev));
+    if (deleteReport.fulfilled.match(res)) {
+      setToast(`Report ${id.slice(0, 8)} deleted.`);
+    } else {
+      setToast((res.payload as string) ?? 'Could not delete the report.');
     }
   };
 
@@ -64,7 +75,7 @@ export default function Reports() {
             onClick={() => handleSelect(r.id)}
             className={`cursor-pointer rounded-2xl transition-shadow ${selectedId === r.id ? 'ring-2 ring-brand shadow-md' : ''}`}
           >
-            <ReportCard report={r} />
+            <ReportCard report={r} onDelete={handleDelete} deleting={deletingId === r.id} />
           </div>
         ))}
       </div>

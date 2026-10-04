@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import {
   createIssueRequest,
+  deleteIssueRequest,
   fetchMyIssuesRequest,
   getApiErrorMessage,
   type BackendIssueStatus,
@@ -136,14 +137,33 @@ export const submitReport = createAsyncThunk<CitizenReport, SubmitReportInput, {
   },
 );
 
+export const deleteReport = createAsyncThunk<string, string, { rejectValue: string }>(
+  'reports/delete',
+  async (reportId, { rejectWithValue }) => {
+    try {
+      return await deleteIssueRequest(reportId);
+    } catch (err) {
+      return rejectWithValue(getApiErrorMessage(err, 'Could not delete the report.'));
+    }
+  },
+);
+
 interface State {
   items: CitizenReport[];
   loading: boolean;
   submitting: boolean;
+  /** Id of the report currently being deleted, so only that card shows a spinner. */
+  deletingId: string | null;
   error: string | null;
 }
 
-const initialState: State = { items: [], loading: false, submitting: false, error: null };
+const initialState: State = {
+  items: [],
+  loading: false,
+  submitting: false,
+  deletingId: null,
+  error: null,
+};
 
 const slice = createSlice({
   name: 'reports',
@@ -169,6 +189,15 @@ const slice = createSlice({
     b.addCase(submitReport.rejected, (s, a) => {
       s.submitting = false;
       s.error = a.payload ?? 'Could not submit the report.';
+    });
+    b.addCase(deleteReport.pending, (s, a) => { s.deletingId = a.meta.arg; s.error = null; });
+    b.addCase(deleteReport.fulfilled, (s, a) => {
+      s.deletingId = null;
+      s.items = s.items.filter((r) => r.id !== a.payload);
+    });
+    b.addCase(deleteReport.rejected, (s, a) => {
+      s.deletingId = null;
+      s.error = a.payload ?? 'Could not delete the report.';
     });
   },
 });

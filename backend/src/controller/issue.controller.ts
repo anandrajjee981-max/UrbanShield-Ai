@@ -6,7 +6,7 @@ import type { CreateIssueRequest } from '../validation/issue.schema.js';
 import { BadRequestError, UnauthorizedError } from '../utils/api-error.js';
 import { sendSuccess } from '../utils/api-response.js';
 import { asyncHandler } from '../utils/async-handler.js';
-
+import { deleteIssue } from '../dao/issue.dao.js';
 /**
  * HTTP layer for citizen issue reports.
  *
@@ -84,6 +84,25 @@ const uploadIssuePhotoHandler = async (req: Request, res: Response): Promise<voi
     imageFileId: image.imageFileId,
   });
 };
+export const deleteIssueHandler: RequestHandler<{ id: string }> = async (req, res) => {
+  if (!req.user) {
+    throw new UnauthorizedError('Authentication required', 'MISSING_TOKEN');
+  }
+
+  const issueId = req.params.id;
+
+  // Optionally, you could check if the issue belongs to the user before deleting
+  // const issue = await issueService.findIssueById(issueId);
+  // if (!issue || issue.userId !== req.user.userId) {
+  //   throw new UnauthorizedError('You do not have permission to delete this issue', 'FORBIDDEN');
+  // }
+
+  await deleteIssue(issueId);
+
+  sendSuccess(res, 200, 'Issue deleted successfully', { issueId });
+};  
+
+
 
 export const createIssue = asyncHandler(createIssueHandler);
 export const listMyIssues = asyncHandler(listMyIssuesHandler);

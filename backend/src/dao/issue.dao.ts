@@ -203,3 +203,9 @@ export const rejectIssue = async (id: string, adminId: string, reason: string | 
 
   return row ? toAdminIssue(row) : null;
 };
+
+export const deleteIssue = async (id: string): Promise<void> => {
+  await query('DELETE FROM issues WHERE id = $1', [id]);
+};
+
+
