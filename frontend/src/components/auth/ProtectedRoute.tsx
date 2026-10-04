@@ -2,7 +2,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchCurrentUser } from '../../store/slices/authSlice';
-import Loader from '../common/Loader';
+import BrandLoader from '../common/BrandLoader';
 
 // Session gate backed by the real backend (GET /api/auth/me).
 // Unauthenticated visits bounce to /login, carrying the original path.
@@ -15,7 +15,7 @@ export default function ProtectedRoute() {
     if (!sessionChecked && !sessionLoading) dispatch(fetchCurrentUser());
   }, [dispatch, sessionChecked, sessionLoading]);
 
-  if (!sessionChecked || sessionLoading) return <Loader />;
+  if (!sessionChecked || sessionLoading) return <BrandLoader />;
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }

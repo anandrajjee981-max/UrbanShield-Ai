@@ -12,3 +12,11 @@ createRoot(document.getElementById('root')!).render(
     </Provider>
   </StrictMode>,
 )
+
+// Fade out the boot splash once React has mounted (idempotent for StrictMode).
+requestAnimationFrame(() => {
+  const splash = document.getElementById('boot-splash');
+  if (!splash) return;
+  splash.classList.add('hide');
+  window.setTimeout(() => splash.remove(), 500);
+});

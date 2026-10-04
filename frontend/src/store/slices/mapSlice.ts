@@ -1,15 +1,71 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { mockRiskZones } from '../../data/mockRiskData';
 import { mockIncidents } from '../../data/mockIncidents';
+import { fetchMyIssuesRequest, type BackendSafeIssue } from '../../services/api';
+import type { Incident, IncidentStatus, Severity } from '../../types';
+import { backendTypeToCategory } from './reportsSlice';
 
 export const fetchMapData = createAsyncThunk('map/fetch', async () => {
   await new Promise((r) => setTimeout(r, 300));
   return { zones: mockRiskZones, incidents: mockIncidents };
 });
 
+const statusToSeverity = (s: BackendSafeIssue['status']): Severity => {
+  switch (s) {
+    case 'REPORTED': return 'high';
+    case 'VERIFIED':
+    case 'ASSIGNED':
+    case 'IN_PROGRESS': return 'medium';
+    case 'RESOLVED':
+    case 'REJECTED':
+    default: return 'low';
+  }
+};
+
+const statusToIncidentStatus = (s: BackendSafeIssue['status']): IncidentStatus =>
+  s === 'RESOLVED' ? 'resolved' : 'active';
+
+/**
+ * A real backend issue → map marker. GPS issues only (MANUAL addresses have
+ * no coordinates worth pinning) and REJECTED ones are skipped.
+ */
+export function backendIssueToMapIncident(
+  issue: BackendSafeIssue,
+  reporterLabel: string,
+): Incident | null {
+  if (issue.latitude === null || issue.longitude === null) return null;
+  if (issue.status === 'REJECTED') return null;
+  const title =
+    issue.description.length > 60 ? `${issue.description.slice(0, 60)}…` : issue.description;
+  return {
+    id: issue.id,
+    title,
+    category: backendTypeToCategory(issue.issueType),
+    severity: statusToSeverity(issue.status),
+    status: statusToIncidentStatus(issue.status),
+    lat: issue.latitude,
+    lng: issue.longitude,
+    address: issue.address ?? `${issue.latitude.toFixed(4)}, ${issue.longitude.toFixed(4)}`,
+    reportedAt: issue.createdAt,
+    reporter: reporterLabel,
+    description: issue.description,
+    affectedRadiusKm: 0.5,
+  };
+}
+
+/** The signed-in user's own live reports as map markers. */
+export const fetchRealMapReports = createAsyncThunk('map/fetchReal', async () => {
+  const issues = await fetchMyIssuesRequest();
+  return issues
+    .map((i) => backendIssueToMapIncident(i, 'You (live report)'))
+    .filter((x): x is Incident => x !== null);
+});
+
 interface MapState {
   zones: typeof mockRiskZones;
   incidents: typeof mockIncidents;
+  /** Live markers from the backend (user's own reports). */
+  realIncidents: Incident[];
   showRiskLayers: boolean;
   showIncidents: boolean;
   activeCategory: string;
@@ -18,7 +74,7 @@ interface MapState {
 }
 
 const initialState: MapState = {
-  zones: [], incidents: [],
+  zones: [], incidents: [], realIncidents: [],
   showRiskLayers: true, showIncidents: true,
   activeCategory: 'all', center: [28.6139, 77.209], loading: false,
 };
@@ -34,6 +90,7 @@ const slice = createSlice({
   extraReducers: (b) => {
     b.addCase(fetchMapData.pending, (s) => { s.loading = true; });
     b.addCase(fetchMapData.fulfilled, (s, a) => { s.loading = false; s.zones = a.payload.zones; s.incidents = a.payload.incidents; });
+    b.addCase(fetchRealMapReports.fulfilled, (s, a) => { s.realIncidents = a.payload; });
   },
 });
 

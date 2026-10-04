@@ -14,12 +14,30 @@ export async function searchLocation(query: string): Promise<GeocodeResult[]> {
   return data;
 }
 
-export function getCurrentPosition(): Promise<[number, number]> {
+export function getCurrentPosition(timeoutMs = 12000): Promise<[number, number]> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) return reject(new Error('Geolocation not supported'));
+    let done = false;
+    const timer = window.setTimeout(() => {
+      if (!done) {
+        done = true;
+        reject(new Error('Location request timed out'));
+      }
+    }, timeoutMs);
     navigator.geolocation.getCurrentPosition(
-      (p) => resolve([p.coords.latitude, p.coords.longitude]),
-      (e) => reject(e),
+      (p) => {
+        if (done) return;
+        done = true;
+        window.clearTimeout(timer);
+        resolve([p.coords.latitude, p.coords.longitude]);
+      },
+      (e) => {
+        if (done) return;
+        done = true;
+        window.clearTimeout(timer);
+        reject(e);
+      },
+      { enableHighAccuracy: false, timeout: timeoutMs, maximumAge: 60000 },
     );
   });
 }

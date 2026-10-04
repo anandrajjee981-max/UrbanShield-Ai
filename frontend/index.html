@@ -12,9 +12,43 @@
           document.documentElement.classList.add('dark');
       } catch (e) {}
     </script>
+    <style>
+      /* Boot splash — inline so it paints before the JS bundle arrives. */
+      #boot-splash { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; background: #fcf9f2; transition: opacity .45s ease; }
+      #boot-splash.hide { opacity: 0; pointer-events: none; }
+      .boot-box { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 24px; }
+      .boot-radar { position: relative; width: 132px; height: 132px; display: flex; align-items: center; justify-content: center; }
+      .boot-core { position: relative; z-index: 2; width: 76px; height: 76px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; color: #fff; background: linear-gradient(135deg, #f84424, #f36d24); box-shadow: 0 8px 28px -6px #f84424; animation: boot-breathe 2.2s ease-in-out infinite; }
+      .boot-ring { position: absolute; inset: 0; border-radius: 9999px; border: 2px solid #f84424; opacity: 0; animation: boot-ring 2.2s ease-out infinite; }
+      .boot-ring.r2 { animation-delay: .7s; } .boot-ring.r3 { animation-delay: 1.4s; }
+      .boot-sweep { position: absolute; inset: 6px; z-index: 1; border-radius: 9999px; background: conic-gradient(from 0deg, rgba(248,68,36,.55), transparent 28%); animation: boot-spin 1.8s linear infinite; }
+      .boot-word { margin-top: 24px; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: #483f25; font-family: ui-sans-serif, system-ui, sans-serif; }
+      .boot-word span { color: #f84424; }
+      .boot-sub { margin-top: 4px; font-size: 11px; font-weight: 700; letter-spacing: .25em; color: #8a7f63; font-family: ui-sans-serif, system-ui, sans-serif; }
+      .boot-bar { margin-top: 16px; height: 6px; width: 208px; overflow: hidden; border-radius: 9999px; background: rgba(232,217,181,.6); position: relative; }
+      .boot-bar i { position: absolute; top: 0; bottom: 0; width: 40%; border-radius: 9999px; background: linear-gradient(90deg, #f84424, #f36d24); animation: boot-slide 1.3s ease-in-out infinite; }
+      @keyframes boot-ring { 0% { transform: scale(.55); opacity: .7; } 100% { transform: scale(1.05); opacity: 0; } }
+      @keyframes boot-spin { to { transform: rotate(360deg); } }
+      @keyframes boot-breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+      @keyframes boot-slide { 0% { left: -40%; } 100% { left: 100%; } }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <div id="boot-splash" aria-label="Loading UrbanShieldAI">
+      <div class="boot-box">
+        <div class="boot-radar">
+          <span class="boot-ring"></span><span class="boot-ring r2"></span><span class="boot-ring r3"></span>
+          <span class="boot-sweep"></span>
+          <span class="boot-core">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+          </span>
+        </div>
+        <p class="boot-word">UrbanShield<span>AI</span></p>
+        <p class="boot-sub">CITY RESILIENCE</p>
+        <div class="boot-bar"><i></i></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
