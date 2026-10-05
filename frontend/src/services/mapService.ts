@@ -82,8 +82,30 @@ export async function getIpLocation(timeoutMs = 8000): Promise<IpLocateResult> {
   return { lat: j.latitude, lon: j.longitude, label };
 }
 
-export function getCurrentPosition(timeoutMs = 12000): Promise<[number, number]> {
-  return new Promise((resolve, reject) => {
+/**
+ * Place name for GPS coordinates (free BigDataCloud client API, no key).
+ * Returns null when unreachable — callers must fall back to a plain name
+ * label, never raw coordinates.
+ */
+export async function reverseGeocode(
+  lat: number,
+  lon: number,
+  timeoutMs = 8000,
+): Promise<{ city: string; country: string } | null> {
+  try {
+    const j = (await fetchJson(
+      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`,
+      timeoutMs,
+    )) as { city?: string; locality?: string; countryName?: string };
+    const city = j.city || j.locality || '';
+    if (!city) return null;
+    return { city, country: j.countryName ?? '' };
+  } catch {
+    return null;
+  }
+}
+
+export function getCurrentPosition(timeoutMs = 12000): Promise<[number, number]> {  return new Promise((resolve, reject) => {
     if (!navigator.geolocation) return reject(new Error('Geolocation not supported'));
     let done = false;
     const timer = window.setTimeout(() => {

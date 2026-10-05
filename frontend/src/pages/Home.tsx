@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -23,6 +24,8 @@ import { toggleTheme } from '../store/slices/uiSlice';
 import { homeForRole } from '../utils/roleHome';
 import { useGsapEntrance } from '../hooks/useGsapEntrance';
 import { useWeather } from '../hooks/useWeather';
+import { useLiveLocation } from '../hooks/useLiveLocation';
+import { fetchWeather } from '../store/slices/weatherSlice';
 import WeatherIcon from '../components/weather/WeatherIcon';
 import { assessWeatherRisk, type RiskLevel } from '../components/weather/weatherRiskConfig';
 
@@ -211,6 +214,29 @@ export default function Home() {
   const { location, forecast, loading: weatherLoading, error: weatherError } = useWeather();
   const today = forecast.length > 0 ? forecast[forecast.length - 1]! : null;
   const todayRisks = today ? assessWeatherRisk(today) : null;
+
+  // Real-time live update: jab browser GPS / IP location mil jaye to usi ke
+  // hisaab se weather auto-refresh ho — default sheher par atka na rahe.
+  // Ek fix par ek hi fetch (applied-key guard), taaki loop na bane.
+  const live = useLiveLocation();
+  const appliedLiveKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (live.locating) return;
+    if (live.source !== 'gps' && live.source !== 'ip') return;
+    const key = `${live.lat.toFixed(3)},${live.lon.toFixed(3)}`;
+    if (appliedLiveKey.current === key) return;
+    const cur = location;
+    if (
+      cur &&
+      Math.abs(cur.latitude - live.lat) < 0.05 &&
+      Math.abs(cur.longitude - live.lon) < 0.05
+    ) {
+      appliedLiveKey.current = key;
+      return;
+    }
+    appliedLiveKey.current = key;
+    dispatch(fetchWeather({ lat: live.lat, lon: live.lon }));
+  }, [dispatch, live.lat, live.lon, live.source, live.locating, location]);
 
   const goDashboard = () => {
     if (isAuthenticated) navigate(homeForRole(role));

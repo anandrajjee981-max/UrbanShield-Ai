@@ -1,0 +1,152 @@
+import { useState } from 'react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import {
+  BarChart3,
+  ClipboardList,
+  FileCheck2,
+  Home,
+  LogOut,
+  Menu,
+  ScrollText,
+  Settings as SettingsIcon,
+  ShieldCheck,
+  X,
+} from 'lucide-react';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { logoutThunk } from '../../store/slices/authSlice';
+
+const LINKS = [
+  { to: '/admin', label: 'Overview', icon: Home, end: true },
+  { to: '/admin/issues', label: 'Issue Monitoring', icon: ClipboardList, end: false },
+  { to: '/admin/authority-applications', label: 'Authority Applications', icon: FileCheck2, end: false },
+  { to: '/admin/analytics', label: 'Analytics', icon: BarChart3, end: true },
+  { to: '/admin/audit-logs', label: 'Audit Logs', icon: ScrollText, end: true },
+  { to: '/admin/settings', label: 'Settings', icon: SettingsIcon, end: true },
+];
+
+/**
+ * Admin shell in the citizen-app civic theme (cream canvas, bark sidebar,
+ * brand-orange active states). Fixed sidebar on desktop, drawer on
+ * tablet/mobile. Only rendered behind AdminRoute (role === ADMIN).
+ */
+export default function AdminLayout() {
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+  const user = useAppSelector((s) => s.auth.user);
+  const [drawer, setDrawer] = useState(false);
+
+  const initials = (user?.name ?? 'A')
+    .split(' ')
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
+  const handleLogout = async () => {
+    setDrawer(false);
+    await dispatch(logoutThunk());
+    navigate('/', { replace: true });
+  };
+
+  const nav = (onNavigate?: () => void) => (
+    <nav className="flex-1 overflow-y-auto p-3 space-y-1" aria-label="Admin navigation">
+      {LINKS.map((l) => (
+        <NavLink
+          key={l.to}
+          to={l.to}
+          end={l.end}
+          onClick={onNavigate}
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+              isActive ? 'bg-brand text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white'
+            }`
+          }
+        >
+          <l.icon size={18} className="shrink-0" />
+          <span className="truncate">{l.label}</span>
+        </NavLink>
+      ))}
+    </nav>
+  );
+
+  const profile = (
+    <div className="p-3 border-t border-white/10">
+      <div className="flex items-center gap-2.5 rounded-xl bg-white/10 border border-white/10 p-3">
+        <div className="w-9 h-9 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shrink-0">
+          {initials}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-bold text-sm truncate leading-tight text-white">{user?.name ?? 'Admin'}</p>
+          <p className="text-[11px] text-slate-400 truncate leading-tight">{user?.email ?? ''}</p>
+          <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-civic-green text-white">
+            ADMIN
+          </span>
+        </div>
+      </div>
+      <button
+        onClick={handleLogout}
+        className="mt-2 w-full flex items-center justify-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-xl bg-white/10 text-slate-200 hover:bg-brand hover:text-white transition-colors"
+      >
+        <LogOut size={15} /> Logout
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="flex h-screen bg-canvas text-ink overflow-hidden">
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:flex w-64 shrink-0 flex-col bg-[#483f25] dark:bg-[#100c07] text-white">
+        <div className="flex items-center gap-2 px-4 h-16 border-b border-white/10 shrink-0">
+          <ShieldCheck size={26} className="text-tag shrink-0" />
+          <div className="min-w-0">
+            <p className="font-bold leading-none truncate">UrbanShieldAI</p>
+            <p className="text-[11px] text-slate-400">Admin Console</p>
+          </div>
+        </div>
+        {nav()}
+        {profile}
+      </aside>
+
+      {/* Mobile/tablet drawer */}
+      {drawer && (
+        <button aria-label="Close menu" onClick={() => setDrawer(false)} className="fixed inset-0 z-30 bg-black/50 lg:hidden" />
+      )}
+      <aside
+        className={`fixed lg:hidden z-40 inset-y-0 left-0 w-64 max-w-[80vw] flex flex-col bg-[#483f25] dark:bg-[#100c07] text-white transition-transform duration-200 ${
+          drawer ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="flex items-center justify-between px-4 h-16 border-b border-white/10 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <ShieldCheck size={24} className="text-tag shrink-0" />
+            <p className="font-bold leading-none truncate">UrbanShieldAI</p>
+          </div>
+          <button onClick={() => setDrawer(false)} aria-label="Close navigation" className="p-2 rounded-lg hover:bg-white/10">
+            <X size={18} />
+          </button>
+        </div>
+        {nav(() => setDrawer(false))}
+        {profile}
+      </aside>
+
+      {/* Main */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="lg:hidden flex items-center gap-2 px-3 h-14 bg-cream border-b border-line shrink-0">
+          <button onClick={() => setDrawer(true)} aria-label="Open navigation" className="p-2 rounded-lg hover:bg-canvas">
+            <Menu size={20} />
+          </button>
+          <ShieldCheck size={20} className="text-brand" />
+          <p className="font-extrabold text-sm">Admin Console</p>
+          <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-civic-green/10 text-civic-green border border-civic-green/30">
+            ADMIN
+          </span>
+        </header>
+        <main className="flex-1 overflow-y-auto p-3 sm:p-5">
+          <div className="mx-auto w-full max-w-[1200px] pb-8">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}

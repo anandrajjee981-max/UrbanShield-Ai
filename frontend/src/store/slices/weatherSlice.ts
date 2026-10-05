@@ -3,7 +3,7 @@ import { fetchWeather as fetchWeatherApi, type WeatherResponse } from '../../ser
 import { getApiErrorMessage } from '../../services/api';
 
 /** Default city shown on first visit (also the placeholder in city search). */
-export const DEFAULT_WEATHER_CITY = 'Jamshedpur';
+export const DEFAULT_WEATHER_CITY = 'Ranchi';
 
 export interface WeatherQuery {
   city?: string;

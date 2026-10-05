@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, LocateFixed, MapPin, RefreshCw, ShieldCheck } from 'lucide-react';
 import { ThreeDayForecast } from '../components/weather/ForecastCard';
 import TemperatureTrend from '../components/weather/TemperatureTrend';
@@ -10,6 +9,7 @@ import { useWeather } from '../hooks/useWeather';
 import { useLiveLocation } from '../hooks/useLiveLocation';
 import { useAppDispatch } from '../store/hooks';
 import { fetchWeather } from '../store/slices/weatherSlice';
+import { useAuthAwareHome } from '../hooks/useAuthAwareHome';
 
 function lastUpdatedLabel(iso: string | null): string {
   if (!iso) return '';
@@ -22,8 +22,9 @@ function lastUpdatedLabel(iso: string | null): string {
 }
 
 export default function WeatherPage() {
-  const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  // Auth-aware home destination: `/` when logged out, role dashboard when
+  // logged in. Guards against redirecting before the session resolves.
   const {
     location,
     timezoneOffset,
@@ -35,6 +36,7 @@ export default function WeatherPage() {
     refresh,
   } = useWeather();
   const loc = useLiveLocation();
+  const { goHome, authReady } = useAuthAwareHome();
   // Manual city search wins — stop auto-applying live coords after it.
   const userSearched = useRef(false);
   // Set on explicit "Live Location" taps so the next GPS/IP fix forces a
@@ -74,7 +76,7 @@ export default function WeatherPage() {
     <div className="min-h-screen bg-canvas text-ink">
       <header className="flex items-center justify-between px-3 sm:px-5 md:px-10 h-16 border-b border-line bg-cream sticky top-0 z-10">
         <button
-          onClick={() => navigate('/')}
+          onClick={goHome}
           className="flex items-center gap-2 min-w-0 text-left"
           title="Back to Home"
         >
@@ -85,10 +87,11 @@ export default function WeatherPage() {
           </span>
         </button>
         <button
-          onClick={() => navigate('/')}
-          className="inline-flex items-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-xl border border-line bg-card hover:border-brand"
+          onClick={goHome}
+          disabled={!authReady}
+          className="inline-flex items-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-xl border border-line bg-card hover:border-brand hover:-translate-x-0.5 transition-all duration-200 disabled:opacity-60"
         >
-          <ArrowLeft size={15} /> Home
+          <ArrowLeft size={15} /> Back to Home
         </button>
       </header>
 
@@ -112,7 +115,7 @@ export default function WeatherPage() {
               </h1>
               <p className="text-xs font-semibold text-mute mt-1 flex items-center gap-1.5 flex-wrap">
                 {location ? (
-                  <span>{`Lat ${location.latitude} · Lon ${location.longitude}`}</span>
+                  <span>{`${location.city}${location.country ? `, ${location.country}` : ''}`}</span>
                 ) : (
                   <span>Live 3-day outlook powered by Open-Meteo</span>
                 )}

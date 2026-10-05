@@ -38,7 +38,6 @@ export default function MapPage() {
           <p className="text-xs sm:text-sm text-mute flex items-center gap-1.5 flex-wrap">
             <MapPin size={13} className="text-brand shrink-0" />
             <span className="font-bold text-soft">{weatherCity ?? loc.label}</span>
-            <span>· GPS {loc.lat.toFixed(4)}, {loc.lon.toFixed(4)}</span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-soft text-brand uppercase tracking-wide">
               {loc.source === 'gps' ? 'GPS live' : loc.source === 'ip' ? 'IP location' : loc.source === 'city' ? 'City' : 'Default'}
             </span>

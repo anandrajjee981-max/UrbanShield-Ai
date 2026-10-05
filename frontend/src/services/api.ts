@@ -11,8 +11,12 @@ import axios, { AxiosError } from 'axios';
  * - Envelope: { success: true, message, data } / { success: false, message, code, errors? }
  * - Issues: POST /issues/ (JSON or multipart with `image` field),
  *   POST /issues/upload, GET /issues/my, DELETE /issues/:id
- * - Admin: GET /admin/issues, GET /admin/issues/:id,
- *   PATCH /admin/issues/:id/verify, PATCH /admin/issues/:id/reject
+ * - Admin: GET /admin/issues, GET /admin/issues/:issueId (monitoring only —
+ *   no issue status transitions; verification belongs to /authority/issues).
+ *   Authority applications live in services/admin.service.ts.
+ *   NOTE: the legacy admin*Issue mutation helpers below target endpoints that no
+ *   longer exist on the backend and are kept only for the legacy /admin/review
+ *   page until it is retired. New code must use services/admin.service.ts.
  */
 
 export const API_BASE_URL =

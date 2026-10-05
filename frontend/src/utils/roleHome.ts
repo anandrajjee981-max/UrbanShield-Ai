@@ -10,7 +10,7 @@ export type Role = AuthUser['role'];
  * admin has a dedicated /admin/login page that enforces role === 'ADMIN'.
  */
 export function homeForRole(role: Role | undefined | null): string {
-  if (role === 'ADMIN') return '/admin-dashboard';
+  if (role === 'ADMIN') return '/admin';
   if (role === 'AUTHORITY') return '/authority';
   return '/dashboard';
 }

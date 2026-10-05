@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppSelector } from '../store/hooks';
-import { getCurrentPosition, getIpLocation } from '../services/mapService';
+import { getCurrentPosition, getIpLocation, reverseGeocode } from '../services/mapService';
 
 export type LiveSource = 'gps' | 'ip' | 'city' | 'default';
 
 /** Fallback when neither GPS nor a searched city is available. */
-export const DEFAULT_LOC = { lat: 22.8, lon: 86.18, label: 'Jamshedpur' };
+export const DEFAULT_LOC = { lat: 23.34, lon: 85.31, label: 'Ranchi' };
+
+/** Shown while a GPS fix is being reverse-geocoded — never raw coordinates. */
+export const LIVE_LOCATION_LABEL = 'Your current location';
 
 export interface LiveLocation {
   lat: number;
   lon: number;
-  /** Human label for the header ("GPS 22.80, 86.18" or the city name). */
+  /** Human-readable place name only ("Ranchi, India") — never coordinates. */
   label: string;
   source: LiveSource;
   locating: boolean;
@@ -30,7 +33,7 @@ const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
  */
 export function useLiveLocation(): LiveLocation {
   const weatherLoc = useAppSelector((s) => s.weather.location);
-  const [gps, setGps] = useState<{ lat: number; lon: number } | null>(null);
+  const [gps, setGps] = useState<{ lat: number; lon: number; label: string | null } | null>(null);
   const [ip, setIp] = useState<{ lat: number; lon: number; label: string } | null>(null);
   const [manual, setManual] = useState<{ lat: number; lon: number; label: string } | null>(null);
   const [locating, setLocating] = useState(false);
@@ -50,10 +53,21 @@ export function useLiveLocation(): LiveLocation {
         throw new Error('unsupported');
       }
       const [lat, lon] = await withTimeout(getCurrentPosition(), 9000);
-      setGps({ lat, lon });
+      setGps({ lat, lon, label: null });
       setIp(null);
       setManual(null);
       setError(null);
+      // Resolve the place name in the background so the UI shows a name
+      // ("Ranchi, India"), never raw coordinates.
+      void reverseGeocode(lat, lon).then((place) => {
+        if (place) {
+          setGps((prev) =>
+            prev && prev.lat === lat && prev.lon === lon
+              ? { ...prev, label: place.country ? `${place.city}, ${place.country}` : place.city }
+              : prev,
+          );
+        }
+      });
       return;
     } catch (e) {
       gpsCode = (e as { code?: number })?.code;
@@ -101,7 +115,7 @@ export function useLiveLocation(): LiveLocation {
     return {
       lat: gps.lat,
       lon: gps.lon,
-      label: `GPS ${gps.lat.toFixed(2)}, ${gps.lon.toFixed(2)}`,
+      label: gps.label ?? LIVE_LOCATION_LABEL,
       source: 'gps',
       locating,
       error,

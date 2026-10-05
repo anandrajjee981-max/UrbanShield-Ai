@@ -13,7 +13,7 @@ const SECTIONS: { label: string; links: Link[] }[] = [
     links: [
       { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true, roles: ['CITIZEN'] },
       { to: '/authority', label: 'Dashboard', icon: LayoutDashboard, end: true, roles: ['AUTHORITY'] },
-      { to: '/admin-dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true, roles: ['ADMIN'] },
+      { to: '/admin', label: 'Admin Console', icon: LayoutDashboard, end: true, roles: ['ADMIN'] },
       { to: '/map', label: 'City Map', icon: Map, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] },
     ],
   },
@@ -23,7 +23,7 @@ const SECTIONS: { label: string; links: Link[] }[] = [
       { to: '/incidents', label: 'Incidents', icon: AlertTriangle, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] },
       { to: '/reports', label: 'Reports', icon: FileText, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] },
       { to: '/weather', label: 'Weather', icon: CloudSun, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] },
-      { to: '/admin', label: 'Admin Review', icon: ClipboardCheck, roles: ['ADMIN'] },
+      { to: '/admin/review', label: 'Admin Review', icon: ClipboardCheck, roles: ['ADMIN'] },
     ],
   },
   {

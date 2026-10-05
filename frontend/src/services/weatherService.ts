@@ -232,6 +232,24 @@ async function resolveLocation(query: WeatherQueryInput): Promise<WeatherLocatio
       longitude: match.longitude,
     };
   }
+  // Live GPS/IP coords: resolve a place name so the UI shows a name
+  // ("Ranchi, India"), never raw coordinates.
+  try {
+    const { data } = await axios.get<{
+      city?: string;
+      locality?: string;
+      countryName?: string;
+    }>('https://api.bigdatacloud.net/data/reverse-geocode-client', {
+      params: { latitude: query.lat, longitude: query.lon, localityLanguage: 'en' },
+      timeout: 8000,
+    });
+    const city = data.city || data.locality || '';
+    if (city) {
+      return { city, country: data.countryName ?? '', latitude: query.lat, longitude: query.lon };
+    }
+  } catch {
+    /* fall through to the plain-name fallback */
+  }
   return {
     city: 'Current location',
     country: '',
