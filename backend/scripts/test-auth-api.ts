@@ -492,7 +492,23 @@ const main = async (): Promise<void> => {
     );
   }
 
-  // 25. role defaults to CITIZEN
+  // 25. role ADMIN cannot be registered publicly
+  {
+    const res = await request('POST', '/api/auth/register', {
+      name: 'City Admin',
+      email: uniqueEmail(),
+      password: PASSWORD,
+      role: 'ADMIN',
+    });
+    check(
+      'POST /api/auth/register ADMIN (400)',
+      res.status === 400 && asRecord(res.json).code === 'VALIDATION_ERROR',
+      res.status,
+      `code=${String(asRecord(res.json).code)}`,
+    );
+  }
+
+  // 26. role defaults to CITIZEN
   {
     const res = await request('POST', '/api/auth/register', {
       name: 'Default Role',

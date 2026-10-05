@@ -1,48 +1,75 @@
 import { Router } from 'express';
-import * as authorityController from '../controller/authority.controller.js';
+import * as authorityIssueController from '../controller/authority-issue.controller.js';
 import { authenticate, requireRole } from '../middleware/auth.middleware.js';
+import { requireVerifiedAuthority } from '../middleware/authority.middleware.js';
 import { validateBody } from '../middleware/validate.middleware.js';
-import { resolveIssueSchema } from '../validation/workflow.schema.js';
+import { rejectIssueSchema, verifyIssueSchema } from '../validation/issue-review.schema.js';
 import type { UserRole } from '../types/auth.types.js';
 
 /**
- * Authority field-workflow routes.
+ * Authority issue review routes (`/api/authority/issues/...`).
  *
- *   GET   /api/authority/issues               - tasks assigned to me
- *   GET   /api/authority/issues/browse        - every citizen report (read-only)
- *   PATCH /api/authority/issues/:issueId/start   - ASSIGNED -> IN_PROGRESS
- *   PATCH /api/authority/issues/:issueId/resolve - IN_PROGRESS -> RESOLVED
+ * Every route on this router runs the same three guards, in this order:
  *
- * Every route runs `authenticate` + `requireRole('AUTHORITY')`, and the owner
- * id is read from the JWT (`req.user.userId`), never from the body - so an
- * authority can only ever list, start or resolve their own tasks. The resolve
- * body carries an optional field note; `{}` and no body are both accepted.
+ *   1. `authenticate`            - reads the JWT from the HTTP-only cookie and sets
+ *                                  `req.user`. No cookie is a 401, and the role is
+ *                                  taken from the verified token, never from a
+ *                                  header or a body field.
+ *   2. `requireRole('AUTHORITY')` - a CITIZEN or an ADMIN gets a 403 here and never
+ *                                  reaches a controller. Registering as AUTHORITY is
+ *                                  what makes someone a *candidate*; it grants
+ *                                  nothing on its own.
+ *   3. `requireVerifiedAuthority()` - the condition `requireRole` cannot express:
+ *                                  role = AUTHORITY **and**
+ *                                  verificationStatus = VERIFIED in the database. A
+ *                                  PENDING or REJECTED candidate gets a 403 with
+ *                                  AUTHORITY_NOT_VERIFIED, so registering as an
+ *                                  authority is never enough to review a citizen
+ *                                  issue - an admin has to verify the applicant
+ *                                  first.
  *
- * `/browse` is registered before `/:issueId` routes so "browse" is never
- * mistaken for an issue id.
+ * The guard reads the status from the database rather than from the JWT on every
+ * request (see src/middleware/authority.middleware.ts for why), which is also what
+ * means a client cannot talk its way in by sending `status: 'VERIFIED'`.
+ *
+ * The transitions are separate actions (`/verify`, `/reject`) rather than one
+ * `PATCH /:issueId` with a `status` field, so there is no endpoint from which a
+ * client can choose an arbitrary status. Both action bodies are `.strict()` Zod
+ * objects, which is the second line of defence: a `verifiedBy` or `status` field
+ * in the body is a 400 even for a verified authority.
  */
 const authorityIssueRouter = Router();
 
-/** The only role allowed to work field tasks. */
+/** The only role that may review citizen reports. */
 const AUTHORITY_ONLY: UserRole[] = ['AUTHORITY'];
 
-authorityIssueRouter.get('/', authenticate, requireRole(...AUTHORITY_ONLY), authorityController.listTasks);
-
-authorityIssueRouter.get('/browse', authenticate, requireRole(...AUTHORITY_ONLY), authorityController.browseReports);
-
-authorityIssueRouter.patch(
-  '/:issueId/start',
+/** Applies the three guards above to a single route. */
+const verifiedAuthorityOnly = [
   authenticate,
   requireRole(...AUTHORITY_ONLY),
-  authorityController.startTask,
+  requireVerifiedAuthority(),
+];
+
+/** GET /api/authority/issues - the issues waiting for authority review. */
+authorityIssueRouter.get('/', ...verifiedAuthorityOnly, authorityIssueController.listIssues);
+
+/** GET /api/authority/issues/:issueId - one issue in full. */
+authorityIssueRouter.get('/:issueId', ...verifiedAuthorityOnly, authorityIssueController.getIssue);
+
+/** PATCH /api/authority/issues/:issueId/verify - REPORTED -> VERIFIED. */
+authorityIssueRouter.patch(
+  '/:issueId/verify',
+  ...verifiedAuthorityOnly,
+  validateBody(verifyIssueSchema),
+  authorityIssueController.verifyIssue,
 );
 
+/** PATCH /api/authority/issues/:issueId/reject - REPORTED -> REJECTED. */
 authorityIssueRouter.patch(
-  '/:issueId/resolve',
-  authenticate,
-  requireRole(...AUTHORITY_ONLY),
-  validateBody(resolveIssueSchema),
-  authorityController.resolveTask,
+  '/:issueId/reject',
+  ...verifiedAuthorityOnly,
+  validateBody(rejectIssueSchema),
+  authorityIssueController.rejectIssue,
 );
 
 export default authorityIssueRouter;

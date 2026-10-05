@@ -142,12 +142,12 @@ export function ThreeDayForecast({
 }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {forecast.map((day, i) => (
+      {forecast.map((day) => (
         <ForecastCard
           key={`${day.label}-${day.date}`}
           day={day}
           timezoneOffset={timezoneOffset}
-          highlight={i === forecast.length - 1}
+          highlight={day.label === 'Today'}
         />
       ))}
     </div>

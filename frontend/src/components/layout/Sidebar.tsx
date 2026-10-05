@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Map, AlertTriangle, FileText, BarChart3, Bot, Siren, ShieldCheck, ClipboardCheck, Briefcase, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, CloudSun, Map, AlertTriangle, FileText, BarChart3, Bot, Siren, ShieldCheck, ClipboardCheck, Briefcase, LogOut, X } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { closeMobileMenu } from '../../store/slices/uiSlice';
 import { logoutThunk } from '../../store/slices/authSlice';
@@ -22,6 +22,7 @@ const SECTIONS: { label: string; links: Link[] }[] = [
     links: [
       { to: '/incidents', label: 'Incidents', icon: AlertTriangle, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] },
       { to: '/reports', label: 'Reports', icon: FileText, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] },
+      { to: '/weather', label: 'Weather', icon: CloudSun, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] },
       { to: '/admin', label: 'Admin Review', icon: ClipboardCheck, roles: ['ADMIN'] },
     ],
   },

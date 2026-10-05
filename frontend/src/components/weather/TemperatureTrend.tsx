@@ -22,7 +22,7 @@ export default function TemperatureTrend({ forecast }: { forecast: WeatherDay[] 
     <section className="bg-card border border-line rounded-2xl p-5 shadow-sm">
       <h2 className="font-extrabold">Temperature Trend</h2>
       <p className="text-xs text-mute mt-0.5 mb-4">
-        Day Before Yesterday → Yesterday → Today · °C
+        Today → Next 2 days · °C
       </p>
       <div className="h-56 sm:h-64 min-w-0">
         <ResponsiveContainer width="100%" height="100%">

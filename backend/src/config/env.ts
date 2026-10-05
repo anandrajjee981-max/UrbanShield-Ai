@@ -73,21 +73,6 @@ const envSchema = z.object({
   ISSUE_IMAGE_MAX_BYTES: z.coerce.number().int().positive().default(5 * 1024 * 1024),
 
   /**
-   * OpenWeatherMap API key for the public weather feature
-   * (GET /api/weather). Optional so the app still boots without it - the
-   * weather endpoint answers 503 WEATHER_NOT_CONFIGURED until a key is set.
-   * The key never leaves the server: the frontend only talks to /api/weather.
-   */
-  OPENWEATHER_API_KEY: z
-    .string()
-    .trim()
-    .min(1, 'OPENWEATHER_API_KEY must not be blank')
-    .optional(),
-
-  /** How many weather lookups one IP may make per minute (each may hit OpenWeatherMap). */
-  WEATHER_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(30),
-
-  /**
    * How many issues one authenticated citizen may report per minute. Anti spam
    * only: a burst well above what a real complaint session needs.
    */
@@ -99,6 +84,25 @@ const envSchema = z.object({
    * and a citizen attaching evidence needs a handful at most.
    */
   ISSUE_UPLOAD_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(20),
+
+  /**
+   * Upper bound for one uploaded government identity document, enforced by multer
+   * before any byte is read from the socket.
+   *
+   * Slightly larger than the issue photo cap because government ID scans are
+   * frequently multi-page PDFs or phone photos at full camera resolution. Still
+   * small on purpose: this value bounds how much of a stranger's identity
+   * document the server will buffer in memory.
+   */
+  AUTHORITY_DOCUMENT_MAX_BYTES: z.coerce.number().int().positive().default(8 * 1024 * 1024),
+
+  /**
+   * How many authority applications one account may submit or re-submit per
+   * minute. An anti-spam ceiling only: a real candidate submits once, then
+   * perhaps once more after a rejection, so this is orders of magnitude above the
+   * genuine rate.
+   */
+  AUTHORITY_APPLICATION_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(10),
 
   /**
    * Browser origin(s) allowed by CORS. Credentials (cookies) are enabled, so

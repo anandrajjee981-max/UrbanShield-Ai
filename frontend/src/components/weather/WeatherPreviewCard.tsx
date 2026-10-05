@@ -8,7 +8,7 @@ export default function WeatherPreviewCard() {
   const navigate = useNavigate();
   const { location, forecast, loading, error } = useWeather();
 
-  const today = forecast[forecast.length - 1];
+  const today = forecast[0];
 
   return (
     <section className="gs-in mt-4 bg-card border border-line rounded-2xl p-5 shadow-sm">

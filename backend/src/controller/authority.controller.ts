@@ -1,71 +1,150 @@
-import type { Request, Response } from 'express';
+import type { Request, RequestHandler, Response } from 'express';
+import type { UploadedAuthorityDocument } from '../models/authority.model.js';
 import * as authorityService from '../service/authority.service.js';
-import { UnauthorizedError } from '../utils/api-error.js';
+import type { SubmitAuthorityApplicationRequest } from '../validation/authority.schema.js';
+import { ForbiddenError, UnauthorizedError } from '../utils/api-error.js';
 import { sendSuccess } from '../utils/api-response.js';
 import { asyncHandler } from '../utils/async-handler.js';
 
 /**
- * HTTP layer for the AUTHORITY field workflow:
+ * HTTP layer for the authority candidate's own endpoints.
  *
- *   GET   /api/authority/issues             - my tasks (assigned_to = me)
- *   PATCH /api/authority/issues/:issueId/start   - ASSIGNED -> IN_PROGRESS
- *   PATCH /api/authority/issues/:issueId/resolve - IN_PROGRESS -> RESOLVED
+ * Responsibilities, and nothing else:
+ *  - read the authenticated candidate from `req.user` (set by `authenticate`)
+ *  - map the optional multipart identity document onto the shape the service wants
+ *  - call the service
+ *  - return the response envelope
  *
- * Mounted behind `authenticate` + `requireRole('AUTHORITY')`. Thin by design:
- * the owner id is always `req.user.userId`, so an authority can only ever
- * move their own tasks.
+ * There is no SQL, no status comparison and no ImageKit access here. In particular
+ * the applicant id is always `req.user.userId`: nothing in the request body or
+ * query string can influence whose application is read or written.
+ *
+ * The route mounts these handlers behind `authenticate` + `requireRole('AUTHORITY')`,
+ * so a CITIZEN or ADMIN is turned away with a 403 before reaching this file.
  */
 
-const requireAuthority = (req: Request): string => {
+/**
+ * The authenticated candidate, or a 401 if the guard was ever skipped.
+ *
+ * `authenticate` guarantees `req.user` on these routes; the check is kept as a
+ * fail-closed guard so a future re-mount cannot silently lose the identity.
+ */
+const requireCandidate = (req: Request): string => {
   if (!req.user) {
     throw new UnauthorizedError('Authentication required', 'MISSING_TOKEN');
+  }
+
+  // Re-checked here as well as on the route. The route's `requireRole` is the
+  // boundary that produces the 403; this is the assertion that keeps the service
+  // from ever being handed a citizen's id if the route is ever re-mounted without it.
+  if (req.user.role !== 'AUTHORITY') {
+    throw new ForbiddenError('Only authority candidates can submit an authority application');
   }
 
   return req.user.userId;
 };
 
-const listTasksHandler = async (req: Request, res: Response): Promise<void> => {
-  const authorityId = requireAuthority(req);
+/**
+ * The in-memory document multer buffered, or null when none was sent.
+ *
+ * The service decides that a document is mandatory (it is identity proof, not an
+ * optional attachment), so the absence is reported here as null rather than as a
+ * 400 - that keeps the rule in one place.
+ */
+const toDocumentFile = (req: Request): UploadedAuthorityDocument | null => {
+  if (!req.file) return null;
 
-  const issues = await authorityService.listMyTasks(authorityId);
-
-  sendSuccess(res, 200, 'Tasks retrieved', { issues });
+  return {
+    buffer: req.file.buffer,
+    originalname: req.file.originalname,
+    mimetype: req.file.mimetype,
+    size: req.file.size,
+  };
 };
 
 /**
- * GET /api/authority/issues/browse - every citizen report on the city,
- * newest first, optionally filtered by `?status=`. Read-only: any issue a
- * citizen reports is visible here from REPORTED onwards.
+ * GET /api/authority/application - the caller's own application, or null when they
+ * have not applied yet.
  */
-const browseReportsHandler = async (req: Request, res: Response): Promise<void> => {
-  requireAuthority(req);
+const getMyApplicationHandler = async (req: Request, res: Response): Promise<void> => {
+  const userId = requireCandidate(req);
 
-  const issues = await authorityService.browseAllReports(req.query);
+  const application = await authorityService.getMyAuthorityApplication(userId);
 
-  sendSuccess(res, 200, 'Reports retrieved', { issues });
+  sendSuccess(res, 200, 'Authority application retrieved', { application });
 };
 
-const startTaskHandler = async (req: Request<{ issueId: string }>, res: Response): Promise<void> => {
-  const authorityId = requireAuthority(req);
+/**
+ * POST /api/authority/application - submit a first application, or re-submit a
+ * rejected one. Lands in PENDING either way.
+ */
+const submitApplicationHandler: RequestHandler<
+  Record<string, string>,
+  unknown,
+  SubmitAuthorityApplicationRequest
+> = async (req, res) => {
+  const userId = requireCandidate(req);
 
-  const issue = await authorityService.startTask({ issueId: req.params.issueId, authorityId });
-
-  sendSuccess(res, 200, 'Task started', { issue });
-};
-
-const resolveTaskHandler = async (req: Request<{ issueId: string }>, res: Response): Promise<void> => {
-  const authorityId = requireAuthority(req);
-
-  const issue = await authorityService.resolveTask({
-    issueId: req.params.issueId,
-    authorityId,
+  const application = await authorityService.submitAuthorityApplication({
+    userId,
     body: req.body,
+    documentFile: toDocumentFile(req),
   });
 
-  sendSuccess(res, 200, 'Task resolved', { issue });
+  sendSuccess(res, 201, 'Authority application submitted successfully', { application });
 };
 
-export const listTasks = asyncHandler(listTasksHandler);
-export const browseReports = asyncHandler(browseReportsHandler);
-export const startTask = asyncHandler(startTaskHandler);
-export const resolveTask = asyncHandler(resolveTaskHandler);
+/**
+ * GET /api/authority/application/options - the closed vocabularies the application
+ * form is built from, so the frontend never offers a value the API would reject.
+ *
+ * Mounted before `/:applicationId` style paths would matter; it takes no
+ * parameters, so there is no shadowing concern.
+ */
+const getApplicationOptionsHandler = async (_req: Request, res: Response): Promise<void> => {
+  const options = authorityService.getAuthorityApplicationOptions();
+
+  sendSuccess(res, 200, 'Authority application options retrieved', { options });
+};
+
+/**
+ * GET /api/authority/profile - the verified-authority view.
+ *
+ * The one route in this module behind `requireVerifiedAuthority`, which is what
+ * makes that guard real rather than aspirational: a PENDING or REJECTED candidate
+ * gets a 403 here, while `GET /api/authority/application` stays open to them so
+ * they can see where they stand.
+ *
+ * It returns the profile fields the future assignment engine will read - skills,
+ * department, designation, jurisdiction, availability - and nothing about workload,
+ * tasks or performance: those are the next module, and inventing them here would
+ * mean the frontend rendered numbers no code produces.
+ */
+const getAuthorityProfileHandler = async (req: Request, res: Response): Promise<void> => {
+  const userId = requireCandidate(req);
+
+  const application = await authorityService.getMyAuthorityApplication(userId);
+
+  sendSuccess(res, 200, 'Authority profile retrieved', {
+    profile: application
+      ? {
+          fullName: application.fullName,
+          email: application.email,
+          phone: application.phone,
+          department: application.department,
+          designation: application.designation,
+          skills: application.skills,
+          jurisdictionType: application.jurisdictionType,
+          jurisdictionName: application.jurisdictionName,
+          availability: application.availability,
+          verificationStatus: application.verificationStatus,
+          verifiedAt: application.verifiedAt,
+        }
+      : null,
+  });
+};
+
+export const getMyApplication = asyncHandler(getMyApplicationHandler);
+export const submitApplication = asyncHandler(submitApplicationHandler);
+export const getApplicationOptions = asyncHandler(getApplicationOptionsHandler);
+export const getAuthorityProfile = asyncHandler(getAuthorityProfileHandler);

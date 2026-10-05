@@ -114,7 +114,7 @@ export default function WeatherPage() {
                 {location ? (
                   <span>{`Lat ${location.latitude} · Lon ${location.longitude}`}</span>
                 ) : (
-                  <span>Live 3-day outlook powered by OpenWeatherMap</span>
+                  <span>Live 3-day outlook powered by Open-Meteo</span>
                 )}
                 {(loc.source === 'gps' || loc.source === 'ip') && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-soft text-brand uppercase tracking-wide">
@@ -166,7 +166,7 @@ export default function WeatherPage() {
             <div className={loading ? 'opacity-60 pointer-events-none' : ''}>
               <ThreeDayForecast forecast={forecast} timezoneOffset={timezoneOffset} />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-                <WeatherRiskCard today={forecast[forecast.length - 1]!} />
+                <WeatherRiskCard today={forecast[0]!} />
                 <TemperatureTrend forecast={forecast} />
               </div>
             </div>
