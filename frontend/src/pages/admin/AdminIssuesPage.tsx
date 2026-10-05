@@ -13,15 +13,8 @@ import {
   inputCls,
 } from '../../components/admin/ui';
 
-const STATUSES: Array<'ALL' | AdminIssueStatus> = [
-  'ALL',
-  'REPORTED',
-  'VERIFIED',
-  'ASSIGNED',
-  'IN_PROGRESS',
-  'RESOLVED',
-  'REJECTED',
-];
+/** Statuses the backend accepts in `?status=` — the review stage only. */
+const STATUSES: Array<'ALL' | AdminIssueStatus> = ['ALL', 'REPORTED', 'VERIFIED', 'REJECTED'];
 
 /**
  * GET /admin/issues — read-only monitoring.

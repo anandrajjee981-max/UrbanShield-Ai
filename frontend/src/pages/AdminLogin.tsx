@@ -34,6 +34,12 @@ export default function AdminLogin() {
     return <Navigate to={homeForRole('ADMIN')} replace />;
   }
 
+  // Already signed in as CITIZEN/AUTHORITY — send them to their own home
+  // instead of leaving them on the admin form.
+  if (isAuthenticated && user) {
+    return <Navigate to={homeForRole(user.role)} replace />;
+  }
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setRoleError(null);

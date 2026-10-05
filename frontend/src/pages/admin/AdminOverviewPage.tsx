@@ -87,7 +87,7 @@ export default function AdminOverviewPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
           <Kpi label="Total Reported Issues" value={stats.totalIssues} sub="All citizen reports" icon={ClipboardList} accent="bg-brand" />
           <Kpi label="Pending Issues" value={stats.pendingIssues} sub="Awaiting authority review" icon={Clock3} accent="bg-civic-amber" />
-          <Kpi label="Critical Issues" value={stats.criticalIssues} sub="Severity tracked on reports" icon={AlertOctagon} accent="bg-brand" />
+          <Kpi label="Resolved Issues" value={stats.resolvedIssues} sub="Completed review outcomes" icon={AlertOctagon} accent="bg-civic-green" />
           <Kpi label="Authority Applications" value={stats.totalApplications} sub="All submissions" icon={FileCheck2} accent="bg-panel" />
           <Kpi label="Pending Applications" value={stats.pendingApplications} sub="Needs admin review" icon={Hourglass} accent="bg-civic-amber-dark" />
           <Kpi label="Verified Authorities" value={stats.verifiedAuthorities} sub="Active verified staff" icon={ShieldCheck} accent="bg-civic-green" />

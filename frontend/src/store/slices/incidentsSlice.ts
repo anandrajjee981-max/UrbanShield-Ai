@@ -1,8 +1,9 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { AxiosError } from 'axios';
 import {
   adminListIssuesRequest,
-  browseReportsRequest,
   fetchMyIssuesRequest,
+  fetchMyTasksRequest,
   getApiErrorMessage,
   type BackendIssueStatus,
   type BackendSafeIssue,
@@ -11,19 +12,23 @@ import type { RootState } from '../store';
 import type { Incident, IncidentStatus, Severity } from '../../types';
 import { backendTypeToCategory } from './reportsSlice';
 
+export const AUTHORITY_NOT_VERIFIED = 'AUTHORITY_NOT_VERIFIED';
+
 // The backend has no dedicated /incidents endpoint, so the command center is
 // fed from the role-scoped real sources: citizens see their own issues
-// (GET /issues/my), authorities see every city report
-// (GET /authority/issues/browse), admins see the full queue
+// (GET /issues/my), authorities see the review queue
+// (GET /authority/issues), admins see the full queue
 // (GET /admin/issues). REJECTED reports are dismissed reports, not active
 // risks, so they stay on the Reports page and out of this list.
 
-function severityFor(status: BackendIssueStatus, complexity: string | null): Severity {
-  if (complexity === 'HIGH') return 'critical';
-  if (complexity === 'MEDIUM') return 'high';
-  if (complexity === 'LOW') return 'medium';
+/**
+ * Display heuristic from the lifecycle status alone. The backend tracks no
+ * severity/complexity, so this is a presentation mapping, not stored data.
+ */
+function severityFor(status: BackendIssueStatus): Severity {
   if (status === 'REPORTED') return 'high';
   if (status === 'RESOLVED') return 'low';
+  if (status === 'REJECTED') return 'low';
   return 'medium';
 }
 
@@ -43,16 +48,13 @@ export function backendIssueToIncident(
     id: issue.id,
     title: description.length > 60 ? `${description.slice(0, 60)}…` : description,
     category: categoryOverride ?? backendTypeToCategory(issue.issueType),
-    severity: severityFor(issue.status, issue.complexity),
+    severity: severityFor(issue.status),
     status: statusFor(issue.status),
     // MANUAL-address reports carry no coordinates — kept null, never faked.
     lat: issue.latitude,
     lng: issue.longitude,
-    address:
-      issue.address ??
-      (issue.latitude !== null && issue.longitude !== null
-        ? `${issue.latitude.toFixed(4)}, ${issue.longitude.toFixed(4)}`
-        : 'Location not provided'),
+    // Name only — coordinates are for map markers, never address text.
+    address: issue.address ?? 'Location not provided',
     reportedAt: issue.createdAt,
     reporter,
     description,
@@ -63,8 +65,9 @@ export function backendIssueToIncident(
 export const fetchIncidents = createAsyncThunk<Incident[], void, { rejectValue: string; state: RootState }>(
   'incidents/fetch',
   async (_, { getState, rejectWithValue }) => {
+    const role = getState().auth.user?.role ?? 'CITIZEN';
+
     try {
-      const role = getState().auth.user?.role ?? 'CITIZEN';
       if (role === 'ADMIN') {
         const issues = await adminListIssuesRequest();
         return issues
@@ -72,16 +75,24 @@ export const fetchIncidents = createAsyncThunk<Incident[], void, { rejectValue: 
           .map((i) => backendIssueToIncident(i, `Citizen report · ${i.citizen.name}`));
       }
       if (role === 'AUTHORITY') {
-        const issues = await browseReportsRequest();
+        const issues = await fetchMyTasksRequest();
         return issues
           .filter((i) => i.status !== 'REJECTED')
-          .map((i) => backendIssueToIncident(i, `Citizen report · ${i.citizen.name}`));
+          .map((i) => backendIssueToIncident(i, 'City report'));
       }
       const issues = await fetchMyIssuesRequest();
       return issues
         .filter((i) => i.status !== 'REJECTED')
         .map((i) => backendIssueToIncident(i, 'You (live report)'));
     } catch (err) {
+      if (
+        role === 'AUTHORITY' &&
+        err instanceof AxiosError &&
+        err.response?.status === 403 &&
+        (err.response.data as { code?: string } | undefined)?.code === AUTHORITY_NOT_VERIFIED
+      ) {
+        return rejectWithValue(AUTHORITY_NOT_VERIFIED);
+      }
       return rejectWithValue(getApiErrorMessage(err, 'Could not load city incidents.'));
     }
   },

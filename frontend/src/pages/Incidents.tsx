@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { RefreshCw, Search, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { fetchIncidents, setSeverityFilter } from '../store/slices/incidentsSlice';
+import {
+  AUTHORITY_NOT_VERIFIED,
+  fetchIncidents,
+  setSeverityFilter,
+} from '../store/slices/incidentsSlice';
 import { setGlobalSearch } from '../store/slices/uiSlice';
 import IncidentCard from '../components/incidents/IncidentCard';
 import { useGsapEntrance } from '../hooks/useGsapEntrance';
@@ -37,6 +42,7 @@ function SkeletonCard() {
 export default function Incidents() {
   const dispatch = useAppDispatch();
   const { items, loading, severityFilter, lastUpdated, error } = useAppSelector((s) => s.incidents);
+  const role = useAppSelector((s) => s.auth.user?.role);
   const globalSearch = useAppSelector((s) => s.ui.globalSearch);
 
   const [query, setQuery] = useState('');
@@ -108,10 +114,26 @@ export default function Incidents() {
   }
 
   if (error && items.length === 0) {
+    const authorityNeedsVerification = role === 'AUTHORITY' && error === AUTHORITY_NOT_VERIFIED;
+
     return (
       <div className="bg-card border border-line rounded-2xl p-8 md:p-12 text-center max-w-lg mx-auto">
-        <p className="text-lg font-extrabold">Unable to load incidents</p>
-        <p className="text-sm text-soft mt-2">Something went wrong while fetching city incidents.</p>
+        <p className="text-lg font-extrabold">
+          {authorityNeedsVerification ? 'Authority verification required' : 'Unable to load incidents'}
+        </p>
+        <p className="text-sm text-soft mt-2">
+          {authorityNeedsVerification
+            ? 'Incident review is available after an administrator verifies your authority account. Check your application status for updates.'
+            : error}
+        </p>
+        {authorityNeedsVerification && (
+          <Link
+            to="/authority/apply"
+            className="mt-5 inline-flex items-center justify-center text-sm font-bold px-6 py-3 rounded-xl border border-line hover:border-brand"
+          >
+            Check application status
+          </Link>
+        )}
         <button
           type="button"
           onClick={() => dispatch(fetchIncidents())}

@@ -59,6 +59,13 @@ export default function AuthorityApplicationDetailsPage() {
 
   useEffect(() => {
     if (applicationId) {
+      // Fresh navigation (same component, new :applicationId) must not show
+      // the previous application's verify/reject toast or action state.
+      dispatch(clearAdminAction());
+      setToast(null);
+      setVerifyOpen(false);
+      setRejectOpen(false);
+      setReason('');
       dispatch(fetchAuthorityApplicationById(applicationId));
       dispatch(fetchAuthorityAuditTrail(applicationId));
     }

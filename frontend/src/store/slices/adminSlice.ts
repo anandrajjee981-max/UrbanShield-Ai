@@ -1,5 +1,6 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import {
+  adminCreateUserRequest,
   fetchAdminIssueByIdRequest,
   fetchAdminIssuesRequest,
   fetchAuthorityApplicationByIdRequest,
@@ -14,6 +15,8 @@ import {
   type AdminAuthorityApplication,
   type AuthorityAuditEntry,
   type AuthorityVerificationStatus,
+  type CreatedUser,
+  type ProvisionableRole,
 } from '../../services/admin.service';
 
 /**
@@ -45,6 +48,9 @@ interface AdminState {
   lastAction: string | null;
   stats: AdminStats | null;
   statsFetch: AsyncSection;
+  createUserLoading: boolean;
+  createUserError: string | null;
+  lastCreatedUser: CreatedUser | null;
 }
 
 const idle = (): AsyncSection => ({ loading: false, error: null });
@@ -65,6 +71,9 @@ const initialState: AdminState = {
   lastAction: null,
   stats: null,
   statsFetch: idle(),
+  createUserLoading: false,
+  createUserError: null,
+  lastCreatedUser: null,
 };
 
 const toStats = (
@@ -186,6 +195,23 @@ export const fetchAuthorityAuditTrail = createAsyncThunk<
   }
 });
 
+export const adminCreateUser = createAsyncThunk<
+  CreatedUser,
+  { name: string; email: string; password: string; role: ProvisionableRole },
+  { rejectValue: string }
+>('admin/createUser', async (input, { rejectWithValue }) => {
+  try {
+    return await adminCreateUserRequest({
+      name: input.name.trim(),
+      email: input.email.trim().toLowerCase(),
+      password: input.password,
+      role: input.role,
+    });
+  } catch (err) {
+    return rejectWithValue(getApiErrorMessage(err, 'Could not create the account.'));
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Slice
 // ---------------------------------------------------------------------------
@@ -207,6 +233,10 @@ const slice = createSlice({
     clearAdminAction: (s) => {
       s.actionError = null;
       s.lastAction = null;
+    },
+    clearCreateUser: (s) => {
+      s.createUserError = null;
+      s.lastCreatedUser = null;
     },
   },
   extraReducers: (b) => {
@@ -324,8 +354,22 @@ const slice = createSlice({
       s.auditFetch = { loading: false, error: a.payload ?? 'Unable to load audit history.' };
       s.auditTrail = [];
     });
+    // Admin user provisioning
+    b.addCase(adminCreateUser.pending, (s) => {
+      s.createUserLoading = true;
+      s.createUserError = null;
+      s.lastCreatedUser = null;
+    });
+    b.addCase(adminCreateUser.fulfilled, (s, a) => {
+      s.createUserLoading = false;
+      s.lastCreatedUser = a.payload;
+    });
+    b.addCase(adminCreateUser.rejected, (s, a) => {
+      s.createUserLoading = false;
+      s.createUserError = a.payload ?? 'Could not create the account.';
+    });
   },
 });
 
-export const { clearSelectedIssue, clearSelectedApplication, clearAdminAction } = slice.actions;
+export const { clearSelectedIssue, clearSelectedApplication, clearAdminAction, clearCreateUser } = slice.actions;
 export default slice.reducer;

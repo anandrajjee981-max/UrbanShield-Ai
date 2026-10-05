@@ -11,7 +11,7 @@ import { fetchIncidents } from '../../store/slices/incidentsSlice';
 import { fetchReports } from '../../store/slices/reportsSlice';
 import { setCenter } from '../../store/slices/mapSlice';
 import { logoutThunk } from '../../store/slices/authSlice';
-import { adminIssueFields, citizenReportFields, matchesQuery, safeIssueFields } from '../../utils/issueSearch';
+import { citizenReportFields, matchesQuery, safeIssueFields } from '../../utils/issueSearch';
 import { homeForRole } from '../../utils/roleHome';
 
 interface SearchHit { key: string; group: string; title: string; sub: string; run: () => void; }
@@ -29,7 +29,6 @@ export default function Topbar({ onSearch }: { onSearch?: (q: string) => void })
   const globalSearch = useAppSelector((s) => s.ui.globalSearch);
   const incidents = useAppSelector((s) => s.incidents.items);
   const reports = useAppSelector((s) => s.reports.items);
-  const browse = useAppSelector((s) => s.workflow.browse);
   const tasks = useAppSelector((s) => s.workflow.tasks);
 
   const [openMenu, setOpenMenu] = useState<'none' | 'feed' | 'profile'>('none');
@@ -83,18 +82,11 @@ export default function Topbar({ onSearch }: { onSearch?: (q: string) => void })
       sub: `${i.address} · ${i.severity}`,
       run: () => { dispatch(setGlobalSearch(i.title.slice(0, 24))); navigate('/incidents'); },
     })));
-    if (browse.length > 0) {
-      push('City reports', browse.filter((b) => matchesQuery(q, adminIssueFields(b))).map((b) => ({
-        key: `brw-${b.id}`, title: b.description.length > 48 ? `${b.description.slice(0, 48)}…` : b.description,
-        sub: `${b.citizen.name} · ${b.status}`,
-        run: () => { dispatch(setGlobalSearch(b.description.slice(0, 24))); navigate(user?.role === 'ADMIN' ? '/admin' : '/tasks'); },
-      })));
-    }
     if (tasks.length > 0) {
-      push('My tasks', tasks.filter((t) => matchesQuery(q, safeIssueFields(t))).map((t) => ({
+      push('Review queue', tasks.filter((t) => matchesQuery(q, safeIssueFields(t))).map((t) => ({
         key: `tsk-${t.id}`, title: t.description.length > 48 ? `${t.description.slice(0, 48)}…` : t.description,
         sub: t.status.replace(/_/g, ' '),
-        run: () => { navigate('/tasks'); },
+        run: () => { navigate(user?.role === 'ADMIN' ? '/admin' : '/tasks'); },
       })));
     }
     // Distinct matching addresses → jump the city map there.
@@ -109,7 +101,7 @@ export default function Topbar({ onSearch }: { onSearch?: (q: string) => void })
       run: () => { dispatch(setCenter([c.lat, c.lng])); navigate('/map'); },
     })));
     return out.slice(0, 12);
-  }, [globalSearch, reports, incidents, browse, tasks, dispatch, navigate, user?.role]);
+  }, [globalSearch, reports, incidents, tasks, dispatch, navigate, user?.role]);
 
   const handleLogout = async () => {
     setOpenMenu('none');

@@ -7,7 +7,7 @@ import Loader from '../components/common/Loader';
 /**
  * Keeps the legacy /dashboard URL working: citizens see the city overview,
  * while AUTHORITY / ADMIN are bounced to their own homes (/authority,
- * /admin-dashboard). Sidebar + post-login navigation use homeForRole
+ * /admin). Sidebar + post-login navigation use homeForRole
  * directly; this is only the fallback for bookmarked /dashboard links.
  */
 export default function DashboardRouter() {

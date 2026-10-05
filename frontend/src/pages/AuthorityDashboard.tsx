@@ -1,11 +1,11 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  AlertTriangle, ArrowRight, Bot, Briefcase, CheckCircle2, FileText,
-  MapPin, Navigation, RefreshCw,
+  AlertTriangle, ArrowRight, CheckCircle2, FileText,
+  RefreshCw,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { fetchBrowseReports, fetchMyTasks } from '../store/slices/workflowSlice';
+import { fetchMyTasks } from '../store/slices/workflowSlice';
 import { setGlobalSearch } from '../store/slices/uiSlice';
 import { backendIssueToIncident } from '../store/slices/incidentsSlice';
 import { useWeather } from '../hooks/useWeather';
@@ -13,7 +13,7 @@ import { useLiveLocation } from '../hooks/useLiveLocation';
 import { assessWeatherRisk, type RiskLevel } from '../components/weather/weatherRiskConfig';
 import WeatherIcon from '../components/weather/WeatherIcon';
 import AuthorityAnalytics from '../components/dashboard/AuthorityAnalytics';
-import type { BackendAdminIssue, BackendSafeIssue } from '../services/api';
+import type { AuthorityTaskIssue } from '../services/api';
 import type { Incident } from '../types';
 import { timeAgo } from '../utils/format';
 
@@ -65,18 +65,15 @@ function Skeleton({ lines = 3 }: { lines?: number }) {
   );
 }
 
-interface ActivityEvent { at: string; text: string; kind: 'report' | 'verify' | 'assign' | 'start' | 'resolve' | 'reject'; id: string; }
+interface ActivityEvent { at: string; text: string; kind: 'report' | 'verify' | 'reject'; id: string; }
 
 /** Real activity trail assembled from backend timestamps on city reports. */
-function buildActivity(browse: BackendAdminIssue[]): ActivityEvent[] {
+function buildActivity(tasks: AuthorityTaskIssue[]): ActivityEvent[] {
   const events: ActivityEvent[] = [];
   const short = (d: string) => (d.length > 56 ? `${d.slice(0, 56)}…` : d);
-  for (const b of browse) {
+  for (const b of tasks) {
     events.push({ at: b.createdAt, text: `Citizen report submitted — ${short(b.description)}`, kind: 'report', id: b.id });
     if (b.verifiedAt) events.push({ at: b.verifiedAt, text: `Report accepted at review — ${short(b.description)}`, kind: 'verify', id: b.id });
-    if (b.assignedAt) events.push({ at: b.assignedAt, text: `Task assigned${b.assignee ? ` to ${b.assignee.name}` : ''}`, kind: 'assign', id: b.id });
-    if (b.startedAt) events.push({ at: b.startedAt, text: `Field work started — ${short(b.description)}`, kind: 'start', id: b.id });
-    if (b.resolvedAt) events.push({ at: b.resolvedAt, text: `Incident resolved — ${short(b.description)}`, kind: 'resolve', id: b.id });
     if (b.rejectedAt) events.push({ at: b.rejectedAt, text: `Report rejected${b.rejectionReason ? ` — ${b.rejectionReason}` : ''}`, kind: 'reject', id: b.id });
   }
   return events
@@ -86,7 +83,7 @@ function buildActivity(browse: BackendAdminIssue[]): ActivityEvent[] {
 }
 
 const activityIcon: Record<ActivityEvent['kind'], typeof FileText> = {
-  report: FileText, verify: CheckCircle2, assign: Briefcase, start: Navigation, resolve: CheckCircle2, reject: AlertTriangle,
+  report: FileText, verify: CheckCircle2, reject: AlertTriangle,
 };
 
 interface QueueItem {
@@ -104,13 +101,14 @@ interface QueueItem {
 /**
  * AUTHORITY home (/authority) — city operations command center.
  * One data story: hero status → prioritized queue → map → pipeline →
- * intelligence → activity. Every value is live backend state (assigned
- * tasks, all city reports, weather). No mock data anywhere on this page.
+ * activity. Every value is live backend state (review queue + weather).
+ * Assignment and field-work stages have no backend API yet, so only the
+ * REPORTED → VERIFIED / REJECTED review workflow is shown — nothing invented.
  */
 export default function AuthorityDashboard() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const { tasks, tasksLoading, browse, browseLoading, error: workflowError } = useAppSelector((s) => s.workflow);
+  const { tasks, tasksLoading, error: workflowError } = useAppSelector((s) => s.workflow);
   const user = useAppSelector((s) => s.auth.user);
   const firstName = (user?.name ?? 'Officer').split(' ')[0];
   const [refreshedAt, setRefreshedAt] = useState<string | null>(null);
@@ -121,7 +119,7 @@ export default function AuthorityDashboard() {
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([dispatch(fetchMyTasks()), dispatch(fetchBrowseReports())]);
+    await dispatch(fetchMyTasks());
     setRefreshedAt(new Date().toISOString());
     setRefreshing(false);
   }, [dispatch]);
@@ -130,14 +128,14 @@ export default function AuthorityDashboard() {
 
   // ── Live city picture (all real) ──
   const incidents = useMemo(
-    () => browse.filter((b) => b.status !== 'REJECTED').map((b) => backendIssueToIncident(b, b.citizen.name)),
-    [browse],
+    () => tasks.filter((b) => b.status !== 'REJECTED').map((b) => backendIssueToIncident(b, 'City report')),
+    [tasks],
   );
-  const byId = useMemo(() => new Map(browse.map((b) => [b.id, b])), [browse]);
+  const byId = useMemo(() => new Map(tasks.map((b) => [b.id, b])), [tasks]);
   const active = useMemo(() => incidents.filter((i) => i.status !== 'resolved'), [incidents]);
   const criticalCount = active.filter((i) => i.severity === 'critical').length;
-  const pendingCount = browse.filter((b) => b.status === 'REPORTED').length;
-  const myActive = tasks.filter((t) => t.status === 'ASSIGNED' || t.status === 'IN_PROGRESS');
+  const pendingCount = tasks.filter((b) => b.status === 'REPORTED').length;
+  const verifiedCount = tasks.filter((b) => b.status === 'VERIFIED').length;
 
   const cityState = criticalCount > 0
     ? { word: 'CRITICAL', cls: 'text-brand' }
@@ -145,46 +143,25 @@ export default function AuthorityDashboard() {
       ? { word: 'ELEVATED', cls: 'text-brand-warm' }
       : { word: 'STABLE', cls: 'text-civic-green' };
 
-  // Unified queue: critical → assigned work → high → everything else actionable.
+  // Unified queue: most severe first, oldest-reported first on ties.
   const queue: QueueItem[] = useMemo(() => {
     const out: QueueItem[] = [];
     const sorted = [...active].sort(
       (a, b) => SEV_RANK[b.severity] - SEV_RANK[a.severity] || +new Date(b.reportedAt) - +new Date(a.reportedAt),
     );
-    for (const inc of sorted.filter((i) => i.severity === 'critical').slice(0, 2)) {
-      out.push({
-        key: `q-${inc.id}`, severity: inc.severity, at: inc.reportedAt,
-        title: inc.title, sub: `${inc.address} · ${timeAgo(inc.reportedAt)}`,
-        action: 'View Incident', status: inc.status.toUpperCase(), pulse: true,
-        run: () => { dispatch(setGlobalSearch(inc.title.slice(0, 24))); navigate('/incidents'); },
-      });
-    }
-    const mine: BackendSafeIssue[] = tasks.filter((t) => t.status === 'ASSIGNED').slice(0, 2);
-    for (const t of mine) {
-      out.push({
-        key: `q-${t.id}`, severity: 'high', at: t.createdAt,
-        title: t.description.length > 64 ? `${t.description.slice(0, 64)}…` : t.description,
-        sub: `${t.address ?? 'No address'} · assigned to you`,
-        action: 'Open Task', status: 'ASSIGNED', pulse: false,
-        run: () => navigate('/tasks'),
-      });
-    }
-    for (const inc of sorted.filter((i) => i.severity !== 'critical').slice(0, 4 - Math.min(2, out.length))) {
+    for (const inc of sorted.slice(0, 6)) {
       const src = byId.get(inc.id);
       const needsReview = src?.status === 'REPORTED';
       out.push({
         key: `q-${inc.id}`, severity: inc.severity, at: inc.reportedAt,
         title: inc.title, sub: `${inc.address} · ${timeAgo(inc.reportedAt)}`,
-        action: needsReview ? 'Review Report' : 'View Incident',
+        action: needsReview ? 'Review Report' : 'View Report',
         status: needsReview ? 'PENDING' : inc.status.toUpperCase(), pulse: inc.severity === 'high',
-        run: () => {
-          if (needsReview) navigate('/reports');
-          else { dispatch(setGlobalSearch(inc.title.slice(0, 24))); navigate('/incidents'); }
-        },
+        run: () => navigate('/tasks'),
       });
     }
     return out.slice(0, 6);
-  }, [active, tasks, byId, dispatch, navigate]);
+  }, [active, byId, navigate]);
 
   const liveFive = useMemo(
     () => [...active].sort(
@@ -194,31 +171,19 @@ export default function AuthorityDashboard() {
   );
 
   const pipeline = useMemo(() => {
-    const c = (s: string) => browse.filter((b) => b.status === s).length;
+    const c = (s: string) => tasks.filter((b) => b.status === s).length;
     return [
       { label: 'Reported', n: c('REPORTED') },
       { label: 'Verified', n: c('VERIFIED') },
-      { label: 'Assigned', n: c('ASSIGNED') },
-      { label: 'In Progress', n: c('IN_PROGRESS') },
-      { label: 'Resolved', n: c('RESOLVED') },
       { label: 'Rejected', n: c('REJECTED') },
     ];
-  }, [browse]);
+  }, [tasks]);
 
-  const activity = useMemo(() => buildActivity(browse), [browse]);
-
-  const aiTop = useMemo(() => {
-    const assessed = browse.filter((b) => b.complexity || b.skillRequired);
-    assessed.sort((a, b) => {
-      const rank = (c: string | null) => (c === 'HIGH' ? 3 : c === 'MEDIUM' ? 2 : c === 'LOW' ? 1 : 0);
-      return rank(b.complexity) - rank(a.complexity);
-    });
-    return assessed[0] ?? null;
-  }, [browse]);
+  const activity = useMemo(() => buildActivity(tasks), [tasks]);
 
   const today = forecast.length > 0 ? forecast[forecast.length - 1]! : null;
   const risks = today ? assessWeatherRisk(today) : null;
-  const booting = (tasksLoading || browseLoading) && tasks.length === 0 && browse.length === 0;
+  const booting = tasksLoading && tasks.length === 0;
 
   return (
     <div className="space-y-7 sm:space-y-8 min-w-0">
@@ -248,10 +213,10 @@ export default function AuthorityDashboard() {
         <>
           {/* ── Analytics (Recharts, all real backend data) — top of dashboard ── */}
           <section aria-label="Operations analytics">
-            <SectionHead eyebrow="Analytics" title="City Analytics" sub="Severity, trend, response and workflow — live." />
+            <SectionHead eyebrow="Analytics" title="City Analytics" sub="Review queue and response trend — live." />
             <div className="mt-3">
-              {browseLoading && browse.length === 0 ? <Skeleton lines={4} /> : (
-                <AuthorityAnalytics browse={browse} forecast={forecast} incidents={incidents} />
+              {tasksLoading && tasks.length === 0 ? <Skeleton lines={4} /> : (
+                <AuthorityAnalytics browse={tasks} forecast={forecast} incidents={incidents} />
               )}
             </div>
           </section>
@@ -264,8 +229,8 @@ export default function AuthorityDashboard() {
               </p>
               <p className="text-white/70 text-xs sm:text-sm mt-2">
                 {active.length === 0
-                  ? 'No active incidents. The city is quiet — review queue and tasks below.'
-                  : `${active.length} active incident${active.length === 1 ? '' : 's'} · ${pendingCount} awaiting review · ${myActive.length} on your plate.`}
+                  ? 'No active incidents. The city is quiet — review queue below.'
+                  : `${active.length} active incident${active.length === 1 ? '' : 's'} · ${pendingCount} awaiting review · ${verifiedCount} verified.`}
               </p>
             </div>
             <div className="md:text-right shrink-0">
@@ -275,7 +240,7 @@ export default function AuthorityDashboard() {
                 {[
                   { label: 'Incidents', value: active.length },
                   { label: 'Reports', value: pendingCount },
-                  { label: 'Active tasks', value: myActive.length },
+                  { label: 'Verified', value: verifiedCount },
                 ].map((s) => (
                   <div key={s.label}>
                     <dd className="text-xl font-extrabold leading-none">{s.value}</dd>
@@ -298,7 +263,7 @@ export default function AuthorityDashboard() {
                 </span>
               ) : undefined}
             />
-            {browseLoading && tasksLoading && browse.length === 0 && tasks.length === 0 ? <Skeleton lines={4} /> : queue.length === 0 ? (
+            {tasksLoading && tasks.length === 0 ? <Skeleton lines={4} /> : queue.length === 0 ? (
               <p className="mt-3 text-sm font-bold text-civic-green flex items-center gap-2">
                 <CheckCircle2 size={16} /> You&apos;re all caught up — no urgent authority actions right now.
               </p>
@@ -344,7 +309,7 @@ export default function AuthorityDashboard() {
               </div>
               <div className="min-w-0">
                 <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-mute mb-2">Live incidents</p>
-                {browseLoading && browse.length === 0 ? <Skeleton lines={5} /> : liveFive.length === 0 ? (
+                {tasksLoading && tasks.length === 0 ? <Skeleton lines={5} /> : liveFive.length === 0 ? (
                   <p className="text-xs text-soft">No active incidents.</p>
                 ) : (
                   <ol className="divide-y divide-line border-y border-line list-none p-0 m-0">
@@ -386,15 +351,15 @@ export default function AuthorityDashboard() {
             </ol>
           </section>
 
-          {/* ── 5 · Response work (compact strip, not a card) ── */}
-          <section aria-label="Your response work" className="flex flex-wrap items-center gap-x-6 gap-y-2 border-y border-line py-3.5">
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-mute">Your response work</p>
-            <p className="text-sm font-bold">{myActive.filter((t) => t.status === 'ASSIGNED').length} Assigned</p>
-            <p className="text-sm font-bold">{myActive.filter((t) => t.status === 'IN_PROGRESS').length} In Progress</p>
-            <p className="text-sm font-bold text-soft">{tasks.filter((t) => t.status === 'RESOLVED').length} Resolved</p>
+          {/* ── 5 · Review work (compact strip, not a card) ── */}
+          <section aria-label="Your review work" className="flex flex-wrap items-center gap-x-6 gap-y-2 border-y border-line py-3.5">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-mute">Your review work</p>
+            <p className="text-sm font-bold">{pendingCount} Pending</p>
+            <p className="text-sm font-bold">{verifiedCount} Verified</p>
+            <p className="text-sm font-bold text-soft">{tasks.filter((t) => t.status === 'REJECTED').length} Rejected</p>
             <button onClick={() => navigate('/tasks')}
               className="ml-auto inline-flex items-center gap-1.5 text-xs font-extrabold px-4 py-2.5 rounded-xl bg-brand text-white hover:bg-brand-warm transition-all duration-150 active:scale-95">
-              Open My Tasks <ArrowRight size={13} />
+              Open Review Queue <ArrowRight size={13} />
             </button>
           </section>
 
@@ -443,44 +408,10 @@ export default function AuthorityDashboard() {
             )}
           </section>
 
-          {/* ── 7 · AI risk brief (honestly labeled — heuristic intelligence) ── */}
-          <section aria-label="Risk intelligence">
-            <SectionHead eyebrow="Intelligence" title="Risk Brief" />
-            {!aiTop ? (
-              <p className="text-xs text-soft mt-2 leading-relaxed">
-                No assessed reports yet. Rule-based risk analysis runs after verification — assessed signals will brief here automatically.
-              </p>
-            ) : (
-              <div className="mt-2 border-l-2 border-brand pl-4 max-w-3xl">
-                <p className="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-brand">
-                  <Bot size={12} /> Risk intelligence · rule-based
-                </p>
-                <p className="text-base sm:text-lg font-bold leading-relaxed mt-1.5">
-                  {aiTop.complexity === 'HIGH' ? 'High-complexity' : aiTop.complexity === 'MEDIUM' ? 'Medium-complexity' : 'Low-complexity'} {aiTop.issueType.replace(/_/g, ' ').toLowerCase()} signal
-                  {aiTop.skillRequired ? ` — ${aiTop.skillRequired.replace(/_/g, ' ').toLowerCase()} crew recommended` : ''}.
-                </p>
-                <p className="text-xs text-soft mt-1.5">{aiTop.description}</p>
-                <div className="flex flex-wrap items-center gap-2 mt-2.5">
-                  {aiTop.complexity && (
-                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase ${aiTop.complexity === 'HIGH' ? 'bg-[#fde8e2] text-[#f84424]' : aiTop.complexity === 'MEDIUM' ? 'bg-[#fdf0c8] text-[#965d13]' : 'bg-[#e9f2e2] text-[#51933a]'}`}>
-                      {aiTop.complexity} risk
-                    </span>
-                  )}
-                  <span className="text-[11px] font-semibold text-mute flex items-center gap-1">
-                    <MapPin size={11} /> {aiTop.address ?? 'No address'}
-                  </span>
-                  <button onClick={() => navigate('/ai')} className="text-[11px] font-extrabold text-brand hover:underline">
-                    Open AI Insights →
-                  </button>
-                </div>
-              </div>
-            )}
-          </section>
-
           {/* ── 8 · Recent activity (timeline, not cards) ── */}
           <section aria-label="Recent city activity">
             <SectionHead eyebrow="Timeline" title="Recent City Activity" />
-            {browseLoading && browse.length === 0 ? <Skeleton lines={4} /> : activity.length === 0 ? (
+            {tasksLoading && tasks.length === 0 ? <Skeleton lines={4} /> : activity.length === 0 ? (
               <p className="text-xs text-soft mt-2">No activity yet — events appear here as reports move through the workflow.</p>
             ) : (
               <ol className="mt-3 relative ml-1.5 border-l-2 border-line space-y-3.5 list-none pl-0 max-w-3xl">
@@ -507,7 +438,7 @@ export default function AuthorityDashboard() {
               { label: 'Review Reports', to: '/reports' },
               { label: 'Open City Map', to: '/map' },
               { label: 'View Incidents', to: '/incidents' },
-              { label: 'My Tasks', to: '/tasks' },
+              { label: 'Review Queue', to: '/tasks' },
               { label: 'Emergency', to: '/emergency' },
             ].map((a) => (
               <button key={a.label} onClick={() => navigate(a.to)}

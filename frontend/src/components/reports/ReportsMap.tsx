@@ -6,7 +6,7 @@ import { MapPin } from 'lucide-react';
 import { TILE_URL, TILE_ATTRIBUTION } from '../../services/mapService';
 import type { CitizenReport } from '../../types';
 
-const DEFAULT_CENTER: [number, number] = [28.6139, 77.209];
+const DEFAULT_CENTER: [number, number] = [23.34, 85.31];
 
 const statusColor: Record<CitizenReport['status'], string> = {
   pending: '#f7b907',
@@ -51,9 +51,11 @@ interface Props {
  * "Full map" jumps to the interactive city map.
  */
 export default function ReportsMap({ reports, selectedId, onSelect }: Props) {
-  const gps = reports.filter((r) => r.locationType === 'GPS');
+  // Only reports that actually carry coordinates are pinned — MANUAL-address
+  // reports have null lat/lng and stay in the list below, never faked.
+  const gps = reports.filter((r) => r.locationType === 'GPS' && r.lat !== null && r.lng !== null);
   const manualCount = reports.length - gps.length;
-  const points = gps.map((r) => [r.lat, r.lng] as [number, number]);
+  const points = gps.map((r) => [r.lat as number, r.lng as number] as [number, number]);
   const selected = gps.find((r) => r.id === selectedId) ?? null;
   // Remount (and refit) only when the pin set itself changes — never on selection.
   const pinsKey = gps.map((r) => r.id).join(',');
@@ -73,11 +75,11 @@ export default function ReportsMap({ reports, selectedId, onSelect }: Props) {
       >
         <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
         <FitPins points={points} />
-        <RecenterOnSelect point={selected ? [selected.lat, selected.lng] : null} />
+        <RecenterOnSelect point={selected && selected.lat !== null && selected.lng !== null ? [selected.lat, selected.lng] : null} />
         {gps.map((r) => (
           <CircleMarker
             key={r.id}
-            center={[r.lat, r.lng]}
+            center={[r.lat as number, r.lng as number]}
             radius={r.id === selectedId ? 12 : 8}
             pathOptions={{
               color: '#fff',

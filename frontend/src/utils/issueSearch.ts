@@ -1,4 +1,4 @@
-import type { BackendAdminIssue, BackendIssueStatus, BackendSafeIssue } from '../services/api';
+import type { BackendAdminIssue } from '../services/api';
 import type { CitizenReport } from '../types';
 
 /**
@@ -15,7 +15,7 @@ const normField = (v: unknown): string =>
   String(v ?? '').toLowerCase().replace(/_/g, ' ');
 
 /** Extra searchable words for a backend lifecycle status. */
-const statusWords = (s: BackendIssueStatus | undefined): string => {
+const statusWords = (s: string | undefined): string => {
   switch (s) {
     case 'REPORTED': return 'reported pending new';
     case 'VERIFIED': return 'verified approved';
@@ -53,8 +53,15 @@ export function citizenReportFields(r: CitizenReport): unknown[] {
   ];
 }
 
-/** Searchable fields of a citizen/authority issue row. */
-export function safeIssueFields(i: BackendSafeIssue): unknown[] {
+/** Searchable fields of a citizen/authority issue row (names only, never coordinates). */
+export function safeIssueFields(i: {
+  description: string;
+  issueType: string;
+  status: string;
+  address: string | null;
+  locationType: string;
+  id: string;
+}): unknown[] {
   return [
     i.description,
     i.issueType,
@@ -62,22 +69,15 @@ export function safeIssueFields(i: BackendSafeIssue): unknown[] {
     statusWords(i.status),
     i.address,
     i.locationType,
-    i.skillRequired,
-    i.complexity,
-    i.resolutionNote,
     i.id.slice(0, 8),
-    i.latitude,
-    i.longitude,
   ];
 }
 
-/** Searchable fields of an authority browse row (adds reporter + crew names). */
+/** Searchable fields of an admin monitoring row (adds reporter name/email). */
 export function adminIssueFields(i: BackendAdminIssue): unknown[] {
   return [
     ...safeIssueFields(i),
     i.citizen?.name,
     i.citizen?.email,
-    i.assignee?.name,
-    i.assignee?.email,
   ];
 }

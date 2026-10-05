@@ -17,13 +17,8 @@ import { api, getApiErrorMessage, type ApiSuccess } from './api';
 // Types (mirror backend/src/models/*)
 // ---------------------------------------------------------------------------
 
-export type AdminIssueStatus =
-  | 'REPORTED'
-  | 'VERIFIED'
-  | 'REJECTED'
-  | 'ASSIGNED'
-  | 'IN_PROGRESS'
-  | 'RESOLVED';
+/** Statuses the backend accepts in `?status=` — the review stage only. */
+export type AdminIssueStatus = 'REPORTED' | 'VERIFIED' | 'REJECTED';
 
 export type AuthorityVerificationStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
 
@@ -36,7 +31,8 @@ export interface AdminMonitoredIssue {
   latitude: number | null;
   longitude: number | null;
   address: string | null;
-  status: AdminIssueStatus;
+  /** Any lifecycle status the backend returns (filter type stays narrow). */
+  status: string;
   verifiedBy: string | null;
   verifiedAt: string | null;
   rejectedBy: string | null;
@@ -105,6 +101,35 @@ export interface AdminStats {
 }
 
 export { getApiErrorMessage };
+
+// ---------------------------------------------------------------------------
+// User provisioning (ADMIN only)
+// ---------------------------------------------------------------------------
+
+export type ProvisionableRole = 'CITIZEN' | 'AUTHORITY' | 'ADMIN';
+
+export interface CreatedUser {
+  id: string;
+  name: string;
+  email: string;
+  role: ProvisionableRole;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * POST /api/admin/users — create any account type, including ADMIN.
+ * The public register endpoint can never do this (backend rejects it).
+ */
+export async function adminCreateUserRequest(input: {
+  name: string;
+  email: string;
+  password: string;
+  role: ProvisionableRole;
+}): Promise<CreatedUser> {
+  const res = await api.post<ApiSuccess<{ user: CreatedUser }>>('/admin/users', input);
+  return res.data.data.user;
+}
 
 // ---------------------------------------------------------------------------
 // Issue monitoring (read-only)

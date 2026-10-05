@@ -6,7 +6,7 @@ import Loader from '../common/Loader';
 /**
  * Role gate inside the authenticated layout: ADMIN-only and AUTHORITY-only
  * pages render here, everyone else bounces to their own role home
- * (citizen /dashboard, authority /authority, admin /admin-dashboard).
+ * (citizen /dashboard, authority /authority, admin /admin).
  */
 export default function RoleRoute({ roles }: { roles: ('CITIZEN' | 'AUTHORITY' | 'ADMIN')[] }) {
   const { user, sessionChecked } = useAppSelector((s) => s.auth);

@@ -12,7 +12,7 @@ const inputCls =
 export default function Register() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const { isAuthenticated, loading, error } = useAppSelector((s) => s.auth);
+  const { isAuthenticated, user, loading, error } = useAppSelector((s) => s.auth);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,7 +22,7 @@ export default function Register() {
   useEffect(() => () => { dispatch(clearAuthError()); }, [dispatch]);
 
   // A freshly registered user is already authenticated → straight to role home
-  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+  if (isAuthenticated) return <Navigate to={homeForRole(user?.role ?? 'CITIZEN')} replace />;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

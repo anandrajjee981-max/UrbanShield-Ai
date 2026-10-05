@@ -1,5 +1,4 @@
 import { Check, X } from 'lucide-react';
-import type { BackendIssueStatus } from '../../services/api';
 
 const STAGES: { key: string; label: string }[] = [
   { key: 'REPORTED', label: 'Reported' },
@@ -9,14 +8,14 @@ const STAGES: { key: string; label: string }[] = [
   { key: 'RESOLVED', label: 'Resolved' },
 ];
 
-const ORDER: BackendIssueStatus[] = ['REPORTED', 'VERIFIED', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED'];
+const ORDER: string[] = ['REPORTED', 'VERIFIED', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED'];
 
 /**
  * Citizen-facing lifecycle strip for one issue.
  * REPORTED → VERIFIED → ASSIGNED → IN_PROGRESS → RESOLVED, with REJECTED
  * shown as a terminal branch off the report step.
  */
-export default function WorkflowTracker({ status }: { status: BackendIssueStatus }) {
+export default function WorkflowTracker({ status }: { status: string }) {
   if (status === 'REJECTED') {
     return (
       <div className="flex items-center gap-2 text-xs font-bold">
@@ -25,7 +24,7 @@ export default function WorkflowTracker({ status }: { status: BackendIssueStatus
         </span>
         <span className="text-mute">→</span>
         <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-[#fde8e2] text-[#f84424]">
-          <X size={12} /> Rejected by admin
+          <X size={12} /> Rejected
         </span>
       </div>
     );

@@ -14,7 +14,7 @@ import type { CitizenReport, IncidentCategory } from '../../types';
 // Connected to the real backend: GET /api/issues/my + POST /api/issues/.
 // The backend has no title/votes/reporter fields, so they are derived for display.
 
-export const backendTypeToCategory = (t: BackendIssueType): IncidentCategory => {
+export const backendTypeToCategory = (t: string): IncidentCategory => {
   switch (t) {
     case 'FLOODING':
     case 'WATER_LEAKAGE':
@@ -72,24 +72,23 @@ export function backendIssueToReport(issue: BackendSafeIssue): CitizenReport {
     category: backendTypeToCategory(issue.issueType),
     title,
     description: issue.description,
-    lat: issue.latitude ?? 28.6139,
-    lng: issue.longitude ?? 77.209,
-    address:
-      issue.address ??
-      (issue.latitude !== null && issue.longitude !== null
-        ? `${issue.latitude.toFixed(4)}, ${issue.longitude.toFixed(4)}`
-        : 'Location not provided'),
+    // MANUAL reports carry null coordinates — kept null, never faked.
+    // Consumers must handle null (only GPS reports are pinned on the map).
+    lat: issue.latitude,
+    lng: issue.longitude,
+    address: issue.address ?? 'Location not provided',
     status: backendStatusToReport(issue.status),
     createdAt: issue.createdAt,
     votes: 0,
     imageUrl: issue.imageUrl ?? undefined,
     locationType: issue.locationType,
     rawStatus: issue.status,
-    resolvedAt: issue.resolvedAt,
-    skillRequired: issue.skillRequired,
-    complexity: issue.complexity,
-    effortHours: issue.effortHours,
-    resolutionNote: issue.resolutionNote,
+    // The analysis/assignment module does not exist on the backend yet.
+    resolvedAt: null,
+    skillRequired: null,
+    complexity: null,
+    effortHours: null,
+    resolutionNote: null,
   };
 }
 

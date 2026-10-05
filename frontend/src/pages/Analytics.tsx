@@ -3,7 +3,8 @@ import { LocateFixed, MapPin, RefreshCw, Search } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchLiveAnalytics } from '../store/slices/analyticsSlice';
 import { fetchReports } from '../store/slices/reportsSlice';
-import { fetchBrowseReports } from '../store/slices/workflowSlice';
+import { fetchMyTasks } from '../store/slices/workflowSlice';
+import { fetchAdminIssues } from '../store/slices/adminSlice';
 import { useLiveLocation } from '../hooks/useLiveLocation';
 import { searchLocation } from '../services/mapService';
 import AnalyticsCharts from '../components/analytics/AnalyticsCharts';
@@ -16,7 +17,8 @@ export default function Analytics() {
   const role = useAppSelector((s) => s.auth.user?.role ?? 'CITIZEN');
   const loc = useLiveLocation();
   const myReports = useAppSelector((s) => s.reports.items);
-  const browse = useAppSelector((s) => s.workflow.browse);
+  const tasks = useAppSelector((s) => s.workflow.tasks);
+  const adminIssues = useAppSelector((s) => s.admin.issues);
   // Manual city fallback — replaces the Default location when GPS is blocked.
   const [city, setCity] = useState('');
   const [citySearching, setCitySearching] = useState(false);
@@ -42,9 +44,11 @@ export default function Analytics() {
   };
 
   // Real issues visible to this role feed the 7-day trend.
+  // AUTHORITY uses the review queue, ADMIN the monitoring view (both real).
   useEffect(() => {
     if (role === 'CITIZEN') dispatch(fetchReports());
-    else dispatch(fetchBrowseReports());
+    else if (role === 'AUTHORITY') dispatch(fetchMyTasks());
+    else dispatch(fetchAdminIssues({ limit: 100 }));
   }, [dispatch, role]);
 
   const issues = useMemo(
@@ -55,8 +59,10 @@ export default function Analytics() {
             status: r.rawStatus ?? 'REPORTED',
             resolvedAt: null as string | null,
           }))
-        : browse.map((b) => ({ createdAt: b.createdAt, status: b.status, resolvedAt: b.resolvedAt })),
-    [role, myReports, browse],
+        : role === 'AUTHORITY'
+          ? tasks.map((b) => ({ createdAt: b.createdAt, status: b.status, resolvedAt: null as string | null }))
+          : adminIssues.map((b) => ({ createdAt: b.createdAt, status: b.status, resolvedAt: null as string | null })),
+    [role, myReports, tasks, adminIssues],
   );
 
   useEffect(() => {

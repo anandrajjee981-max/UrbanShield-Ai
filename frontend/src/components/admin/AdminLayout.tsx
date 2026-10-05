@@ -10,6 +10,7 @@ import {
   ScrollText,
   Settings as SettingsIcon,
   ShieldCheck,
+  UserPlus,
   X,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -19,6 +20,7 @@ const LINKS = [
   { to: '/admin', label: 'Overview', icon: Home, end: true },
   { to: '/admin/issues', label: 'Issue Monitoring', icon: ClipboardList, end: false },
   { to: '/admin/authority-applications', label: 'Authority Applications', icon: FileCheck2, end: false },
+  { to: '/admin/users/new', label: 'Create User', icon: UserPlus, end: true },
   { to: '/admin/analytics', label: 'Analytics', icon: BarChart3, end: true },
   { to: '/admin/audit-logs', label: 'Audit Logs', icon: ScrollText, end: true },
   { to: '/admin/settings', label: 'Settings', icon: SettingsIcon, end: true },

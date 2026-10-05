@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, CloudSun, Map, AlertTriangle, FileText, BarChart3, Bot, Siren, ShieldCheck, ClipboardCheck, Briefcase, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, CloudSun, Map, AlertTriangle, FileText, BarChart3, Bot, Siren, ShieldCheck, Briefcase, BadgeCheck, CircleUserRound, LogOut, X } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { closeMobileMenu } from '../../store/slices/uiSlice';
 import { logoutThunk } from '../../store/slices/authSlice';
@@ -23,13 +23,14 @@ const SECTIONS: { label: string; links: Link[] }[] = [
       { to: '/incidents', label: 'Incidents', icon: AlertTriangle, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] },
       { to: '/reports', label: 'Reports', icon: FileText, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] },
       { to: '/weather', label: 'Weather', icon: CloudSun, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] },
-      { to: '/admin/review', label: 'Admin Review', icon: ClipboardCheck, roles: ['ADMIN'] },
     ],
   },
   {
     label: 'Operations',
     links: [
-      { to: '/tasks', label: 'My Tasks', icon: Briefcase, roles: ['AUTHORITY'] },
+      { to: '/tasks', label: 'Review Queue', icon: Briefcase, roles: ['AUTHORITY'] },
+      { to: '/authority/apply', label: 'Verification', icon: BadgeCheck, roles: ['AUTHORITY'] },
+      { to: '/authority/profile', label: 'My Profile', icon: CircleUserRound, roles: ['AUTHORITY'] },
       { to: '/emergency', label: 'Emergency', icon: Siren, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] },
     ],
   },

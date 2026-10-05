@@ -4,7 +4,6 @@ import CityMap from '../components/map/CityMap';
 import NearbyPanel from '../components/map/NearbyPanel';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchMapData, fetchRealMapReports } from '../store/slices/mapSlice';
-import { fetchBrowseReports } from '../store/slices/workflowSlice';
 import { useLiveLocation } from '../hooks/useLiveLocation';
 
 export default function MapPage() {
@@ -20,9 +19,9 @@ export default function MapPage() {
   const [recenterKey, setRecenterKey] = useState(0);
   useEffect(() => {
     dispatch(fetchMapData());
-    // Live backend markers: citizen sees own reports, authority/admin see all city reports.
+    // Live backend markers: citizens see their own reports. Staff see the
+    // same on their role screens (no city-wide browse endpoint exists yet).
     if (role === 'CITIZEN') dispatch(fetchRealMapReports());
-    else dispatch(fetchBrowseReports());
   }, [dispatch, role]);
 
   const goLive = () => {

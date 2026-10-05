@@ -107,7 +107,7 @@ export default function IncidentDetailsModal({
               <dd className="font-bold mt-1">{incident.address}</dd>
               <dd className="text-mute mt-0.5">
                 {incident.lat !== null && incident.lng !== null
-                  ? `${incident.lat.toFixed(4)}, ${incident.lng.toFixed(4)} · ±${incident.affectedRadiusKm} km`
+                  ? `GPS-pinned · ±${incident.affectedRadiusKm} km`
                   : 'Manual address — no GPS pin'}
               </dd>
             </div>

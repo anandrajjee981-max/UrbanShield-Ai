@@ -10,13 +10,13 @@ import axios, { AxiosError } from 'axios';
  *   `withCredentials: true` is required and no token is stored in JS.
  * - Envelope: { success: true, message, data } / { success: false, message, code, errors? }
  * - Issues: POST /issues/ (JSON or multipart with `image` field),
- *   POST /issues/upload, GET /issues/my, DELETE /issues/:id
+ *   POST /issues/upload, GET /issues/my, DELETE /issues/:id (own report only)
  * - Admin: GET /admin/issues, GET /admin/issues/:issueId (monitoring only —
  *   no issue status transitions; verification belongs to /authority/issues).
  *   Authority applications live in services/admin.service.ts.
- *   NOTE: the legacy admin*Issue mutation helpers below target endpoints that no
- *   longer exist on the backend and are kept only for the legacy /admin/review
- *   page until it is retired. New code must use services/admin.service.ts.
+ * - Authority: GET /authority/issues (review queue), GET /:issueId,
+ *   PATCH /:issueId/verify ({}), PATCH /:issueId/reject ({reason?}).
+ *   No browse/start/resolve/assign/analyze/workforce endpoints exist yet.
  */
 
 export const API_BASE_URL =
@@ -115,6 +115,10 @@ export type CreateIssueBody =
       imageFileId?: string;
     };
 
+/**
+ * Citizen's own report, exactly as GET /api/issues/my returns it
+ * (backend toSafeIssue — no review metadata, no analysis fields).
+ */
 export interface BackendSafeIssue {
   id: string;
   issueType: BackendIssueType;
@@ -125,57 +129,29 @@ export interface BackendSafeIssue {
   longitude: number | null;
   address: string | null;
   status: BackendIssueStatus;
-  skillRequired: string | null;
-  complexity: string | null;
-  effortHours: number | null;
-  aiAnalyzedAt: string | null;
-  assignedAt: string | null;
-  startedAt: string | null;
-  resolvedAt: string | null;
-  resolutionNote: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface BackendAdminIssue extends BackendSafeIssue {
-  citizen: { name: string; email: string };
+/**
+ * Authority review shape (GET /api/authority/issues...): the report plus the
+ * verify/reject metadata a reviewer needs. No citizen identity, no analysis
+ * or assignment fields — those modules do not exist on the backend yet.
+ */
+export interface AuthorityTaskIssue extends BackendSafeIssue {
   verifiedBy: string | null;
   verifiedAt: string | null;
   rejectedBy: string | null;
   rejectedAt: string | null;
   rejectionReason: string | null;
-  assignedTo: string | null;
-  assignee: { name: string; email: string } | null;
-  assignedBy: string | null;
 }
 
-export interface WorkflowAnalysis {
-  skillRequired: string;
-  complexity: string;
-  effortHours: number;
-  analyzedAt: string;
-}
-
-export interface WorkforceMember {
-  id: string;
-  name: string;
-  email: string;
-  activeAssignments: number;
-  available: boolean;
-}
-
-export interface AssignmentCandidate {
-  authority: WorkforceMember;
-  score: number;
-  reason: string;
-}
-
-export interface AssignmentRecommendation {
-  issueId: string;
-  analysis: WorkflowAnalysis;
-  workforce: WorkforceMember[];
-  ranking: AssignmentCandidate[];
-  recommendedAuthorityId: string | null;
+/**
+ * Admin monitoring shape (GET /api/admin/issues...): the authority review
+ * shape plus the reporting citizen. Read-only.
+ */
+export interface BackendAdminIssue extends AuthorityTaskIssue {
+  citizen: { name: string; email: string };
 }
 
 // ---------------------------------------------------------------------------
@@ -268,8 +244,11 @@ export async function createIssueRequest(
 // Admin review — /api/admin/issues (requires ADMIN cookie session)
 // ---------------------------------------------------------------------------
 
+/** Statuses the backend accepts in `?status=` (review stage only). */
+export type ReviewStageStatus = 'REPORTED' | 'VERIFIED' | 'REJECTED';
+
 export async function adminListIssuesRequest(params?: {
-  status?: 'REPORTED' | 'VERIFIED' | 'REJECTED' | 'ASSIGNED' | 'IN_PROGRESS' | 'RESOLVED';
+  status?: ReviewStageStatus;
   limit?: number;
 }): Promise<BackendAdminIssue[]> {
   const res = await api.get<ApiSuccess<{ issues: BackendAdminIssue[] }>>('/admin/issues', {
@@ -283,29 +262,30 @@ export async function adminGetIssueRequest(issueId: string): Promise<BackendAdmi
   return res.data.data.issue;
 }
 
-export async function adminVerifyIssueRequest(issueId: string): Promise<BackendAdminIssue> {
-  const res = await api.patch<ApiSuccess<{ issue: BackendAdminIssue }>>(
-    `/admin/issues/${issueId}/verify`,
+// ---------------------------------------------------------------------------
+// Authority review — /api/authority/issues (verified AUTHORITY only)
+// ---------------------------------------------------------------------------
+
+/** REPORTED -> VERIFIED. Body is exactly {} — the endpoint decides everything. */
+export async function authorityVerifyIssueRequest(issueId: string): Promise<AuthorityTaskIssue> {
+  const res = await api.patch<ApiSuccess<{ issue: AuthorityTaskIssue }>>(
+    `/authority/issues/${issueId}/verify`,
     {},
   );
   return res.data.data.issue;
 }
 
-export async function adminRejectIssueRequest(
+/** REPORTED -> REJECTED. Only an optional reason may be sent. */
+export async function authorityRejectIssueRequest(
   issueId: string,
   reason?: string,
-): Promise<BackendAdminIssue> {
-  const res = await api.patch<ApiSuccess<{ issue: BackendAdminIssue }>>(
-    `/admin/issues/${issueId}/reject`,
-    reason ? { reason } : {},
+): Promise<AuthorityTaskIssue> {
+  const trimmed = reason?.trim();
+  const res = await api.patch<ApiSuccess<{ issue: AuthorityTaskIssue }>>(
+    `/authority/issues/${issueId}/reject`,
+    trimmed ? { reason: trimmed } : {},
   );
   return res.data.data.issue;
-}
-
-/** Permanently removes a REJECTED issue (ADMIN cleanup). */
-export async function deleteRejectedIssueRequest(issueId: string): Promise<{ id: string }> {
-  const res = await api.delete<ApiSuccess<{ deleted: { id: string } }>>(`/admin/issues/${issueId}`);
-  return res.data.data.deleted;
 }
 
 export async function checkBackendHealth(): Promise<boolean> {
@@ -321,70 +301,20 @@ export async function checkBackendHealth(): Promise<boolean> {
 }
 
 // ---------------------------------------------------------------------------
-// Admin assignment workflow — VERIFIED -> (AI analysis + recommendation) -> ASSIGNED
+// Authority review queue — GET /api/authority/issues (verified AUTHORITY only)
 // ---------------------------------------------------------------------------
-
-export async function analyzeIssueRequest(issueId: string): Promise<BackendAdminIssue> {
-  const res = await api.post<ApiSuccess<{ issue: BackendAdminIssue }>>(
-    `/admin/issues/${issueId}/analyze`,
-    {},
-  );
-  return res.data.data.issue;
-}
-
-export async function recommendAssignmentRequest(issueId: string): Promise<AssignmentRecommendation> {
-  const res = await api.get<ApiSuccess<{ recommendation: AssignmentRecommendation }>>(
-    `/admin/issues/${issueId}/recommendation`,
-  );
-  return res.data.data.recommendation;
-}
-
-export async function assignIssueRequest(issueId: string, authorityId: string): Promise<BackendAdminIssue> {
-  const res = await api.post<ApiSuccess<{ issue: BackendAdminIssue }>>(
-    `/admin/issues/${issueId}/assign`,
-    { authorityId },
-  );
-  return res.data.data.issue;
-}
-
-export async function fetchWorkforceRequest(): Promise<WorkforceMember[]> {
-  const res = await api.get<ApiSuccess<{ workforce: WorkforceMember[] }>>('/admin/issues/workforce');
-  return res.data.data.workforce;
-}
-
-// ---------------------------------------------------------------------------
-// Authority field workflow — ASSIGNED -> IN_PROGRESS -> RESOLVED
-// ---------------------------------------------------------------------------
-
-export async function fetchMyTasksRequest(): Promise<BackendSafeIssue[]> {
-  const res = await api.get<ApiSuccess<{ issues: BackendSafeIssue[] }>>('/authority/issues');
-  return res.data.data.issues;
-}
 
 /**
- * Every citizen report on the city (read-only browse for AUTHORITY staff).
- * Any issue a citizen reports appears here from REPORTED onwards, with the
- * reporter and assignee context attached.
+ * The authority review queue (REPORTED/VERIFIED/REJECTED with review
+ * metadata). There is no separate "my tasks" endpoint yet — assignment is a
+ * future module — so this queue is what AUTHORITY screens are built on.
  */
-export async function browseReportsRequest(status?: string): Promise<BackendAdminIssue[]> {
-  const res = await api.get<ApiSuccess<{ issues: BackendAdminIssue[] }>>('/authority/issues/browse', {
-    params: status ? { status } : undefined,
+export async function fetchMyTasksRequest(params?: {
+  status?: ReviewStageStatus;
+  limit?: number;
+}): Promise<AuthorityTaskIssue[]> {
+  const res = await api.get<ApiSuccess<{ issues: AuthorityTaskIssue[] }>>('/authority/issues', {
+    params,
   });
   return res.data.data.issues;
-}
-
-export async function startTaskRequest(issueId: string): Promise<BackendSafeIssue> {
-  const res = await api.patch<ApiSuccess<{ issue: BackendSafeIssue }>>(
-    `/authority/issues/${issueId}/start`,
-    {},
-  );
-  return res.data.data.issue;
-}
-
-export async function resolveTaskRequest(issueId: string, note?: string): Promise<BackendSafeIssue> {
-  const res = await api.patch<ApiSuccess<{ issue: BackendSafeIssue }>>(
-    `/authority/issues/${issueId}/resolve`,
-    note ? { note } : {},
-  );
-  return res.data.data.issue;
 }

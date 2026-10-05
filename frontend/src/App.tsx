@@ -4,8 +4,8 @@ import AppLayout from './components/layout/AppLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import RoleRoute from './components/auth/RoleRoute';
 import AdminRoute from './components/auth/AdminRoute';
+import AuthorityRoute from './components/auth/AuthorityRoute';
 import AdminLayout from './components/admin/AdminLayout';
-import AdminReview from './pages/AdminReview';
 import AdminLogin from './pages/AdminLogin';
 import AdminOverviewPage from './pages/admin/AdminOverviewPage';
 import AdminIssuesPage from './pages/admin/AdminIssuesPage';
@@ -13,10 +13,13 @@ import AdminIssueDetailsPage from './pages/admin/AdminIssueDetailsPage';
 import AuthorityApplicationsPage from './pages/admin/AuthorityApplicationsPage';
 import AuthorityApplicationDetailsPage from './pages/admin/AuthorityApplicationDetailsPage';
 import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage';
+import AdminCreateUserPage from './pages/admin/AdminCreateUserPage';
 import AdminAuditLogsPage from './pages/admin/AdminAuditLogsPage';
 import AdminSettingsPage from './pages/admin/AdminSettingsPage';
 import AdminNotFoundPage from './pages/admin/AdminNotFoundPage';
 import AuthorityDashboard from './pages/AuthorityDashboard';
+import AuthorityApplyPage from './pages/authority/AuthorityApplyPage';
+import AuthorityProfilePage from './pages/authority/AuthorityProfilePage';
 import DashboardRouter from './pages/DashboardRouter';
 import AiInsights from './pages/AiInsights';
 import Analytics from './pages/Analytics';
@@ -68,10 +71,9 @@ function AppRoutes() {
             element={<AuthorityApplicationDetailsPage />}
           />
           <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
+          <Route path="/admin/users/new" element={<AdminCreateUserPage />} />
           <Route path="/admin/audit-logs" element={<AdminAuditLogsPage />} />
           <Route path="/admin/settings" element={<AdminSettingsPage />} />
-          {/* Legacy review workflow (read + assign), kept for existing bookmarks. */}
-          <Route path="/admin/review" element={<AdminReview />} />
           <Route path="/admin/*" element={<AdminNotFoundPage />} />
         </Route>
       </Route>
@@ -85,6 +87,13 @@ function AppRoutes() {
           </Route>
           <Route element={<RoleRoute roles={['AUTHORITY']} />}>
             <Route path="/authority" element={<AuthorityDashboard />} />
+          </Route>
+          {/* Authority verification doorway — AUTHORITY role only (any status).
+              No layout here: the outer AppLayout above already provides the
+              single sidebar + header; AuthorityRoute only gates by role. */}
+          <Route element={<AuthorityRoute />}>
+            <Route path="/authority/apply" element={<AuthorityApplyPage />} />
+            <Route path="/authority/profile" element={<AuthorityProfilePage />} />
           </Route>
           {/* Legacy admin home — redirects into the new console. */}
           <Route element={<RoleRoute roles={['ADMIN']} />}>

@@ -23,8 +23,9 @@ export interface CitizenReport {
   category: IncidentCategory;
   title: string;
   description: string;
-  lat: number;
-  lng: number;
+  /** Null for MANUAL-address reports (backend has no coordinates for them) — never faked. */
+  lat: number | null;
+  lng: number | null;
   address: string;
   status: 'pending' | 'verified' | 'rejected' | 'actioned';
   createdAt: string;

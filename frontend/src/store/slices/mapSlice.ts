@@ -46,7 +46,7 @@ export function backendIssueToMapIncident(
     status: statusToIncidentStatus(issue.status),
     lat: issue.latitude,
     lng: issue.longitude,
-    address: issue.address ?? `${issue.latitude.toFixed(4)}, ${issue.longitude.toFixed(4)}`,
+    address: issue.address ?? 'Location not provided',
     reportedAt: issue.createdAt,
     reporter: reporterLabel,
     description: issue.description,
@@ -77,7 +77,7 @@ interface MapState {
 const initialState: MapState = {
   zones: [], incidents: [], realIncidents: [],
   showRiskLayers: true, showIncidents: true,
-  activeCategory: 'all', center: [28.6139, 77.209], loading: false,
+  activeCategory: 'all', center: [23.34, 85.31], loading: false,
 };
 
 const slice = createSlice({

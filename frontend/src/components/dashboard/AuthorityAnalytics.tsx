@@ -3,7 +3,7 @@ import {
   Bar, BarChart, CartesianGrid, Cell, Line, LineChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
-import type { BackendAdminIssue } from '../../services/api';
+import type { AuthorityTaskIssue } from '../../services/api';
 import type { WeatherDay } from '../../services/weatherService';
 import type { Incident } from '../../types';
 
@@ -23,10 +23,11 @@ export function transformIncidentRiskData(incidents: Incident[]): RiskRow[] {
   ];
 }
 
-export interface TrendRow { date: string; incidents: number; resolved: number; }
+export interface TrendRow { date: string; incidents: number; }
 
-/** Last 7 full days: submissions by createdAt, completions by resolvedAt. */
-export function transformIncidentTrendData(browse: BackendAdminIssue[]): TrendRow[] {
+/** Last 7 full days: submissions by createdAt. Resolutions are not tracked by
+ * the backend yet (no assignment module), so no resolved series is shown. */
+export function transformIncidentTrendData(browse: AuthorityTaskIssue[]): TrendRow[] {
   const DAY = 86400000;
   const now = new Date();
   now.setHours(0, 0, 0, 0);
@@ -41,50 +42,18 @@ export function transformIncidentTrendData(browse: BackendAdminIssue[]): TrendRo
     return {
       date: new Date(start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       incidents: browse.filter((b) => inWin(b.createdAt)).length,
-      resolved: browse.filter((b) => inWin(b.resolvedAt)).length,
     };
   });
 }
 
-export interface ResponseRow { date: string; hours: number; }
-
-/** Per-day mean assign→resolve time (hours) for days with ≥1 completion. */
-export function transformResponseData(browse: BackendAdminIssue[]): ResponseRow[] {
-  const DAY = 86400000;
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const rows: ResponseRow[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const start = now.getTime() - i * DAY;
-    const end = start + DAY;
-    const hrs = browse
-      .filter((b) => {
-        if (!b.assignedAt || !b.resolvedAt) return false;
-        const t = new Date(b.resolvedAt).getTime();
-        return !Number.isNaN(t) && t >= start && t < end;
-      })
-      .map((b) => (new Date(b.resolvedAt as string).getTime() - new Date((b.assignedAt as string)).getTime()) / 3600000)
-      .filter((h) => h >= 0);
-    if (hrs.length > 0) {
-      rows.push({
-        date: new Date(start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        hours: Math.round((hrs.reduce((a, x) => a + x, 0) / hrs.length) * 10) / 10,
-      });
-    }
-  }
-  return rows;
-}
-
 export interface WorkflowRow { stage: string; count: number; }
 
-export function transformWorkflowData(browse: BackendAdminIssue[]): WorkflowRow[] {
+/** Live counts per review stage the backend actually tracks. */
+export function transformWorkflowData(browse: AuthorityTaskIssue[]): WorkflowRow[] {
   const c = (s: string) => browse.filter((b) => b.status === s).length;
   return [
     { stage: 'Reported', count: c('REPORTED') },
     { stage: 'Verified', count: c('VERIFIED') },
-    { stage: 'Assigned', count: c('ASSIGNED') },
-    { stage: 'In Progress', count: c('IN_PROGRESS') },
-    { stage: 'Resolved', count: c('RESOLVED') },
     { stage: 'Rejected', count: c('REJECTED') },
   ];
 }
@@ -124,16 +93,15 @@ function Empty({ children }: { children: React.ReactNode }) {
 }
 
 export default function AuthorityAnalytics({ browse, forecast, incidents }: {
-  browse: BackendAdminIssue[]; forecast: WeatherDay[]; incidents: Incident[];
+  browse: AuthorityTaskIssue[]; forecast: WeatherDay[]; incidents: Incident[];
 }) {
   const risk = useMemo(() => transformIncidentRiskData(incidents), [incidents]);
   const trend = useMemo(() => transformIncidentTrendData(browse), [browse]);
-  const response = useMemo(() => transformResponseData(browse), [browse]);
   const workflow = useMemo(() => transformWorkflowData(browse), [browse]);
   const temps = useMemo(() => transformTempOutlook(forecast), [forecast]);
 
   const hasRisk = risk.some((r) => r.count > 0);
-  const hasTrend = trend.some((t) => t.incidents > 0 || t.resolved > 0);
+  const hasTrend = trend.some((t) => t.incidents > 0);
 
   return (
     <div className="grid md:grid-cols-2 gap-4 items-start">
@@ -155,7 +123,7 @@ export default function AuthorityAnalytics({ browse, forecast, incidents }: {
         )}
       </ChartShell>
 
-      <ChartShell title="Incident Trend" sub="Submissions vs resolutions, last 7 days.">
+      <ChartShell title="Incident Trend" sub="Submissions, last 7 days.">
         {!hasTrend ? <Empty>No historical data available yet.</Empty> : (
           <div className="h-52 sm:h-60">
             <ResponsiveContainer width="100%" height="100%">
@@ -165,25 +133,6 @@ export default function AuthorityAnalytics({ browse, forecast, incidents }: {
                 <YAxis tick={tick} allowDecimals={false} />
                 <Tooltip />
                 <Line type="monotone" dataKey="incidents" name="Submitted" stroke="var(--brand)" strokeWidth={2.5} dot={false} isAnimationActive={!reduceMotion} />
-                <Line type="monotone" dataKey="resolved" name="Resolved" stroke="var(--green)" strokeWidth={2.5} dot={false} isAnimationActive={!reduceMotion} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </ChartShell>
-
-      <ChartShell title="Response Performance" sub="Mean assign → resolve time, days with completions.">
-        {response.length < 2 ? (
-          <Empty>Response performance will appear after enough completed tasks are recorded.</Empty>
-        ) : (
-          <div className="h-52 sm:h-60">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={response} margin={{ top: 4, right: 4, bottom: 0, left: -14 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--grid)" />
-                <XAxis dataKey="date" tick={tick} />
-                <YAxis tick={tick} />
-                <Tooltip formatter={(v) => [`${v} hrs`, 'Avg response']} />
-                <Line type="monotone" dataKey="hours" name="Avg response (hrs)" stroke="var(--blue)" strokeWidth={2.5} isAnimationActive={!reduceMotion} />
               </LineChart>
             </ResponsiveContainer>
           </div>

@@ -1,21 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   AlertTriangle, ArrowRight, CheckCircle2, Clock, Droplets, Flame, HeartPulse,
   Loader2, MapPin, RefreshCw, Search, Thermometer, Trash2, Wind, Wrench, X,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { deleteReport, fetchReports } from '../store/slices/reportsSlice';
-import { fetchBrowseReports } from '../store/slices/workflowSlice';
+import { fetchMyTasks } from '../store/slices/workflowSlice';
+import { fetchAdminIssues } from '../store/slices/adminSlice';
 import { pushNotification } from '../store/slices/notificationsSlice';
 import { setGlobalSearch } from '../store/slices/uiSlice';
-import { adminIssueFields, citizenReportFields, matchesQuery } from '../utils/issueSearch';
+import { citizenReportFields, matchesQuery, safeIssueFields } from '../utils/issueSearch';
 import { backendTypeToCategory } from '../store/slices/reportsSlice';
-import type { BackendAdminIssue } from '../services/api';
 import type { CitizenReport } from '../types';
 import ReportFormModal from '../components/reports/ReportFormModal';
-import ReportReviewModal from '../components/reports/ReportReviewModal';
+import ReportReviewModal, { type ReviewIssue } from '../components/reports/ReportReviewModal';
 import WorkflowTracker from '../components/workflow/WorkflowTracker';
-import AnalysisCard from '../components/workflow/AnalysisCard';
 import Loader from '../components/common/Loader';
 import { useGsapEntrance } from '../hooks/useGsapEntrance';
 import { timeAgo } from '../utils/format';
@@ -170,7 +170,6 @@ function CitizenDetailModal({ report, onClose }: { report: CitizenReport; onClos
             <WorkflowTracker status={report.rawStatus} />
           </div>
         )}
-        <AnalysisCard skillRequired={report.skillRequired ?? null} complexity={report.complexity ?? null} effortHours={report.effortHours ?? null} />
         {report.resolutionNote && (
           <p className="text-xs text-soft italic border-l-2 border-civic-green pl-3">Authority response: “{report.resolutionNote}”</p>
         )}
@@ -184,18 +183,19 @@ function CitizenDetailModal({ report, onClose }: { report: CitizenReport; onClos
 // Page
 // ---------------------------------------------------------------------------
 
-type StaffStatus = 'ALL' | 'REPORTED' | 'VERIFIED' | 'REJECTED' | 'IN_PROGRESS' | 'RESOLVED';
-const STAFF_FILTERS: StaffStatus[] = ['ALL', 'REPORTED', 'VERIFIED', 'IN_PROGRESS', 'RESOLVED', 'REJECTED'];
+type StaffStatus = 'ALL' | 'REPORTED' | 'VERIFIED' | 'REJECTED';
+const STAFF_FILTERS: StaffStatus[] = ['ALL', 'REPORTED', 'VERIFIED', 'REJECTED'];
 const STAFF_FILTER_LABEL: Record<StaffStatus, string> = {
-  ALL: 'All', REPORTED: 'Pending', VERIFIED: 'Accepted', IN_PROGRESS: 'In Progress', RESOLVED: 'Resolved', REJECTED: 'Rejected',
+  ALL: 'All', REPORTED: 'Pending', VERIFIED: 'Accepted', REJECTED: 'Rejected',
 };
 
 export default function Reports() {
   const dispatch = useAppDispatch();
   const role = useAppSelector((s) => s.auth.user?.role ?? 'CITIZEN');
-  const myId = useAppSelector((s) => s.auth.user?.id);
   const isStaff = role === 'AUTHORITY' || role === 'ADMIN';
-  const canReview = role === 'ADMIN';
+  // Only verified AUTHORITY can verify/reject (PATCH /authority/issues/...).
+  // ADMIN monitors read-only.
+  const canReview = role === 'AUTHORITY';
 
   // Citizen state
   const { items, loading, error, deletingId } = useAppSelector((s) => s.reports);
@@ -204,18 +204,26 @@ export default function Reports() {
   const [toast, setToast] = useState<string | null>(null);
   const [viewReport, setViewReport] = useState<CitizenReport | null>(null);
 
-  // Staff state
-  const { browse, browseLoading, error: workflowError } = useAppSelector((s) => s.workflow);
+  // Staff state — role-scoped real sources (no browse endpoint exists):
+  // AUTHORITY sees the review queue, ADMIN sees the monitoring view.
+  const { tasks, tasksLoading, error: tasksError } = useAppSelector((s) => s.workflow);
+  const { issues: adminIssues, issuesFetch } = useAppSelector((s) => s.admin);
+  const staffItems: ReviewIssue[] = useMemo(
+    () => (role === 'ADMIN' ? adminIssues : tasks),
+    [role, adminIssues, tasks],
+  );
+  const staffLoading = role === 'ADMIN' ? issuesFetch.loading : tasksLoading;
+  const staffError = role === 'ADMIN' ? issuesFetch.error : tasksError;
   const [staffFilter, setStaffFilter] = useState<StaffStatus>('ALL');
   const [staffQuery, setStaffQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
-  const [complexityFilter, setComplexityFilter] = useState<string>('ALL');
-  const [reviewIssue, setReviewIssue] = useState<BackendAdminIssue | null>(null);
+  const [reviewIssue, setReviewIssue] = useState<ReviewIssue | null>(null);
 
   useEffect(() => {
-    if (isStaff) dispatch(fetchBrowseReports());
+    if (role === 'ADMIN') dispatch(fetchAdminIssues({ limit: 100 }));
+    else if (role === 'AUTHORITY') dispatch(fetchMyTasks());
     else dispatch(fetchReports());
-  }, [dispatch, isStaff]);
+  }, [dispatch, role]);
 
   useEffect(() => {
     if (!toast) return;
@@ -227,34 +235,30 @@ export default function Reports() {
 
   const categories = useMemo(() => {
     const set = new Set<string>();
-    browse.forEach((b) => set.add(b.issueType));
+    staffItems.forEach((b) => set.add(b.issueType));
     return [...set].sort();
-  }, [browse]);
+  }, [staffItems]);
 
   const filteredStaff = useMemo(() => {
     const q = staffQuery.trim().toLowerCase();
-    return browse.filter((b) => {
-      if (staffFilter === 'IN_PROGRESS') {
-        if (b.status !== 'ASSIGNED' && b.status !== 'IN_PROGRESS') return false;
-      } else if (staffFilter !== 'ALL' && b.status !== staffFilter) return false;
+    return staffItems.filter((b) => {
+      if (staffFilter !== 'ALL' && b.status !== staffFilter) return false;
       if (categoryFilter !== 'ALL' && b.issueType !== categoryFilter) return false;
-      if (complexityFilter === 'UNASSESSED') {
-        if (b.complexity) return false;
-      } else if (complexityFilter !== 'ALL' && b.complexity !== complexityFilter) return false;
       if (q !== '') {
-        const hay = `${b.id} ${b.description} ${b.address ?? ''} ${b.issueType} ${b.citizen.name} ${b.citizen.email}`.toLowerCase().replace(/_/g, ' ');
+        const hay = `${b.id} ${b.description} ${b.address ?? ''} ${b.issueType} ${b.citizen?.name ?? ''} ${b.citizen?.email ?? ''}`.toLowerCase().replace(/_/g, ' ');
         if (!q.split(/\s+/).every((t) => hay.includes(t))) return false;
       }
-      if (globalSearch.trim() !== '' && !matchesQuery(globalSearch, adminIssueFields(b))) return false;
+      if (globalSearch.trim() !== '' && !matchesQuery(globalSearch, [...safeIssueFields(b), b.citizen?.name, b.citizen?.email])) return false;
       return true;
     });
-  }, [browse, staffFilter, categoryFilter, complexityFilter, staffQuery, globalSearch]);
+  }, [staffItems, staffFilter, categoryFilter, staffQuery, globalSearch]);
 
   useGsapEntrance('.gs-in', [isStaff ? filteredStaff.length : filteredCitizen.length, staffFilter]);
 
-  const openReview = (issue: BackendAdminIssue) => setReviewIssue(issue);
-  const refreshBrowse = () => {
-    dispatch(fetchBrowseReports());
+  const openReview = (issue: ReviewIssue) => setReviewIssue(issue);
+  const refreshStaff = () => {
+    if (role === 'ADMIN') dispatch(fetchAdminIssues({ limit: 100 }));
+    else dispatch(fetchMyTasks());
     setReviewIssue((prev) => {
       if (!prev) return prev;
       // The modal stays open; the list refresh brings the updated row.
@@ -338,14 +342,12 @@ export default function Reports() {
   }
 
   // ── AUTHORITY / ADMIN VIEW ──
-  const total = browse.length;
-  const pending = browse.filter((b) => b.status === 'REPORTED').length;
-  const accepted = browse.filter((b) => b.status === 'VERIFIED').length;
-  const rejected = browse.filter((b) => b.status === 'REJECTED').length;
-  const inProgress = browse.filter((b) => b.status === 'ASSIGNED' || b.status === 'IN_PROGRESS').length;
-  const resolved = browse.filter((b) => b.status === 'RESOLVED').length;
+  const total = staffItems.length;
+  const pending = staffItems.filter((b) => b.status === 'REPORTED').length;
+  const accepted = staffItems.filter((b) => b.status === 'VERIFIED').length;
+  const rejected = staffItems.filter((b) => b.status === 'REJECTED').length;
 
-  if (browseLoading && browse.length === 0) {
+  if (staffLoading && staffItems.length === 0) {
     return (
       <div className="space-y-4">
         <div>
@@ -364,21 +366,19 @@ export default function Reports() {
           <h1 className="text-xl sm:text-2xl font-extrabold">Reports to Review</h1>
           <p className="text-xs sm:text-sm text-mute">Review citizen reports, verify the information, and take action.</p>
         </div>
-        <button onClick={() => dispatch(fetchBrowseReports())} disabled={browseLoading}
+        <button onClick={refreshStaff} disabled={staffLoading}
           className="inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl border border-line bg-card hover:border-brand disabled:opacity-50 shrink-0">
-          <RefreshCw size={13} className={browseLoading ? 'animate-spin' : ''} /> Refresh
+          <RefreshCw size={13} className={staffLoading ? 'animate-spin' : ''} /> Refresh
         </button>
       </div>
 
       {/* Summary — dynamic */}
-      <dl className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-px bg-line border border-line rounded-2xl overflow-hidden">
+      <dl className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-line border border-line rounded-2xl overflow-hidden">
         {[
           { label: 'Total reports', value: total },
           { label: 'Pending', value: pending },
           { label: 'Accepted', value: accepted },
           { label: 'Rejected', value: rejected },
-          { label: 'In progress', value: inProgress },
-          { label: 'Resolved', value: resolved },
         ].map((s) => (
           <div key={s.label} className="bg-card px-4 py-3">
             <dt className="text-[10px] font-extrabold text-mute uppercase tracking-widest">{s.label}</dt>
@@ -413,23 +413,27 @@ export default function Reports() {
           <option value="ALL">All categories</option>
           {categories.map((c) => <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>)}
         </select>
-        <select value={complexityFilter} onChange={(e) => setComplexityFilter(e.target.value)} aria-label="Filter by AI complexity" title="Priority estimate from AI analysis" className={selectCls}>
-          <option value="ALL">All priorities</option>
-          <option value="HIGH">High</option>
-          <option value="MEDIUM">Medium</option>
-          <option value="LOW">Low</option>
-          <option value="UNASSESSED">Not assessed</option>
-        </select>
       </div>
 
-      {workflowError && (
+      {staffError && !staffError.includes('verified') && (
         <div className="flex items-center justify-between gap-3 text-xs font-semibold px-3 py-2.5 rounded-xl bg-[#fde8e2] text-brand">
           <span>Unable to load reports.</span>
-          <button onClick={() => dispatch(fetchBrowseReports())} className="shrink-0 underline">Retry</button>
+          <button onClick={refreshStaff} className="shrink-0 underline">Retry</button>
+        </div>
+      )}
+      {staffError?.includes('verified') && (
+        <div className="bg-card border border-civic-amber/40 rounded-2xl p-5 text-center">
+          <p className="font-extrabold text-ink text-sm">Verification required</p>
+          <p className="text-xs text-mute mt-1 max-w-md mx-auto">
+            Your authority account has not been verified by an administrator yet. Apply for verification to review reports.
+          </p>
+          <Link to="/authority/apply" className="mt-4 inline-block text-sm font-bold px-5 py-2.5 rounded-xl bg-brand text-white hover:bg-brand-warm">
+            Apply for Verification
+          </Link>
         </div>
       )}
 
-      {browse.length === 0 && !browseLoading ? (
+      {staffItems.length === 0 && !staffLoading ? (
         <div className="border border-dashed border-line rounded-2xl p-8 md:p-12 text-center">
           <p className="text-base font-extrabold">You&apos;re all caught up.</p>
           <p className="text-sm text-soft mt-1.5">No citizen reports are waiting for review.</p>
@@ -441,7 +445,7 @@ export default function Reports() {
         </div>
       ) : (
         <>
-          <p className="text-[11px] font-bold text-mute uppercase tracking-wide">Showing {filteredStaff.length} of {browse.length}</p>
+          <p className="text-[11px] font-bold text-mute uppercase tracking-wide">Showing {filteredStaff.length} of {staffItems.length}</p>
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
             {filteredStaff.map((b) => {
               const Icon = categoryIcon[backendTypeToCategory(b.issueType)] ?? AlertTriangle;
@@ -465,19 +469,18 @@ export default function Reports() {
                     <span className="flex items-center gap-1.5">
                       <Clock size={12} className="shrink-0" />
                       <span className="font-semibold">Submitted {timeAgo(b.createdAt)}</span>
-                      <span aria-hidden className="text-line">·</span>
-                      <span className="truncate">{b.citizen.name}</span>
+                      {b.citizen && (
+                        <>
+                          <span aria-hidden className="text-line">·</span>
+                          <span className="truncate">{b.citizen.name}</span>
+                        </>
+                      )}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
                     <span className="text-[10px] font-extrabold px-2 py-1 rounded-full bg-canvas border border-line text-soft uppercase">
                       {b.issueType.replace(/_/g, ' ')}
                     </span>
-                    {b.complexity && (
-                      <span className={`text-[10px] font-extrabold px-2 py-1 rounded-full uppercase ${b.complexity === 'HIGH' ? 'bg-[#fde8e2] text-[#f84424]' : b.complexity === 'MEDIUM' ? 'bg-[#fdf0c8] text-[#965d13]' : 'bg-[#e9f2e2] text-[#51933a]'}`}>
-                        {b.complexity} priority
-                      </span>
-                    )}
                   </div>
                   <button onClick={() => openReview(b)}
                     className="mt-3 w-full inline-flex items-center justify-center gap-1 text-xs font-extrabold px-3 py-2.5 rounded-xl bg-brand-soft text-brand border border-brand/20 hover:bg-brand hover:text-white transition-colors">
@@ -492,11 +495,10 @@ export default function Reports() {
 
       {reviewIssue && (
         <ReportReviewModal
-          issue={browse.find((b) => b.id === reviewIssue.id) ?? reviewIssue}
+          issue={staffItems.find((b) => b.id === reviewIssue.id) ?? reviewIssue}
           canReview={canReview}
-          myId={myId}
           onClose={() => setReviewIssue(null)}
-          onChanged={refreshBrowse}
+          onChanged={refreshStaff}
         />
       )}
     </div>
