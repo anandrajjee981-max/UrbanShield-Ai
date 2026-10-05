@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Briefcase, ClipboardCheck, FilePlus2 } from 'lucide-react';
+import { ArrowRight, Briefcase, ClipboardCheck, FilePlus2, ShieldCheck } from 'lucide-react';
 
 /**
  * Role entry point for the main citizen → admin → authority workflow,
@@ -35,11 +35,20 @@ export default function WorkflowBanner({ role }: { role: 'CITIZEN' | 'AUTHORITY'
     },
   }[role];
 
+  const isCitizen = role === 'CITIZEN';
+
   return (
     <div className="gs-in bg-panel text-white rounded-2xl p-5 md:p-6 flex flex-col md:flex-row md:items-center gap-4">
-      <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
-        <config.icon size={20} />
-      </div>
+      {isCitizen ? (
+        /* UrbanShieldAI brand logo for the citizen "Report a civic issue" banner */
+        <div className="w-12 h-12 rounded-2xl bg-brand flex items-center justify-center shadow-lg shrink-0">
+          <ShieldCheck size={26} className="text-white" />
+        </div>
+      ) : (
+        <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+          <config.icon size={20} />
+        </div>
+      )}
       <div className="flex-1 min-w-0">
         <p className="font-extrabold">{config.title}</p>
         <p className="text-sm text-[#e8d9b5] mt-0.5">{config.desc}</p>

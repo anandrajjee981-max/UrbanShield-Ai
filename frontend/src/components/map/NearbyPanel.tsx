@@ -23,7 +23,8 @@ export default function NearbyPanel({ lat, lon, label }: { lat: number; lon: num
   const nearby = useMemo(() => {
     const RADIUS_KM = 15;
     const incidents = allIncidents
-      .map((i) => ({ ...i, km: kmBetween(lat, lon, i.lat, i.lng) }))
+      .filter((i) => i.lat !== null && i.lng !== null)
+      .map((i) => ({ ...i, km: kmBetween(lat, lon, i.lat as number, i.lng as number) }))
       .filter((i) => i.km <= RADIUS_KM)
       .sort((a, b) => a.km - b.km);
     const zoneList = zones

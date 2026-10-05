@@ -4,6 +4,10 @@ import AppLayout from './components/layout/AppLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import RoleRoute from './components/auth/RoleRoute';
 import AdminReview from './pages/AdminReview';
+import AdminDashboard from './pages/AdminDashboard';
+import AdminLogin from './pages/AdminLogin';
+import AuthorityDashboard from './pages/AuthorityDashboard';
+import DashboardRouter from './pages/DashboardRouter';
 import AiInsights from './pages/AiInsights';
 import Analytics from './pages/Analytics';
 import AuthorityTasks from './pages/AuthorityTasks';
@@ -39,9 +43,21 @@ function AppRoutes() {
       <Route path="/weather" element={<WeatherPage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      {/* Dedicated admin entry — public, but enforces role === 'ADMIN' after login. */}
+      <Route path="/admin/login" element={<AdminLogin />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
+          {/* Legacy URL: citizens see the overview, staff bounce to their home. */}
+          <Route path="/dashboard" element={<DashboardRouter />} />
+          <Route element={<RoleRoute roles={['CITIZEN']} />}>
+            <Route path="/citizen" element={<Dashboard />} />
+          </Route>
+          <Route element={<RoleRoute roles={['AUTHORITY']} />}>
+            <Route path="/authority" element={<AuthorityDashboard />} />
+          </Route>
+          <Route element={<RoleRoute roles={['ADMIN']} />}>
+            <Route path="/admin-dashboard" element={<AdminDashboard />} />
+          </Route>
           <Route path="/map" element={<MapPage />} />
           <Route path="/incidents" element={<Incidents />} />
           <Route path="/reports" element={<Reports />} />

@@ -119,8 +119,9 @@ export default function CityMap({ live, recenterKey }: { live: LiveLocation; rec
             <LocateFixed size={14} className={locatingMe ? 'animate-pulse' : ''} /> {locatingMe ? 'Locating…' : 'Locate me'}
           </button>
           <button onClick={() => dispatch(toggleRiskLayers())}
+            title="Illustrative risk zones — no backend endpoint provides these yet"
             className={`flex items-center gap-1.5 rounded-xl shadow px-3 py-2 border text-xs font-semibold whitespace-nowrap ${showRiskLayers ? 'bg-brand text-white border-brand' : 'bg-card border-line text-soft'}`}>
-            <Layers size={14} /> Risk: {showRiskLayers ? 'ON' : 'OFF'}
+            <Layers size={14} /> Zones (demo): {showRiskLayers ? 'ON' : 'OFF'}
           </button>
           <button onClick={() => dispatch(toggleIncidents())}
             className={`rounded-xl shadow px-3 py-2 border text-xs font-semibold whitespace-nowrap ${showIncidents ? 'bg-brand text-white border-brand' : 'bg-card border-line text-soft'}`}>
@@ -187,8 +188,8 @@ export default function CityMap({ live, recenterKey }: { live: LiveLocation; rec
             <Popup><b>{z.name}</b><br />Type: {z.riskType} · Score: {z.score}<br />Population: {z.population.toLocaleString()}</Popup>
           </Circle>
         ))}
-        {showIncidents && filtered.map((i) => (
-          <Marker key={i.id} position={[i.lat, i.lng]}>
+        {showIncidents && filtered.filter((i) => i.lat !== null && i.lng !== null).map((i) => (
+          <Marker key={i.id} position={[i.lat as number, i.lng as number]}>
             <Popup><b>{i.title}</b><br />{i.address}<br /><span style={{ color: severityColor[i.severity], fontWeight: 700 }}>{i.severity.toUpperCase()}</span> · {i.status}<br />{i.reporter}{liveIds.has(i.id) && ' · ● LIVE'}</Popup>
           </Marker>
         ))}

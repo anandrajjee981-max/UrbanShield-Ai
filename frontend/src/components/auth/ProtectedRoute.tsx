@@ -17,7 +17,9 @@ export default function ProtectedRoute() {
 
   if (!sessionChecked || sessionLoading) return <BrandLoader />;
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    // Admin URLs get the admin login (which enforces ADMIN role), not the citizen form.
+    const login = location.pathname.startsWith('/admin') ? '/admin/login' : '/login';
+    return <Navigate to={login} replace state={{ from: location.pathname }} />;
   }
   return <Outlet />;
 }

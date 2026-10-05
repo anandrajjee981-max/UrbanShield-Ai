@@ -1,6 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
 import auth from './slices/authSlice';
-import dashboard from './slices/dashboardSlice';
 import incidents from './slices/incidentsSlice';
 import reports from './slices/reportsSlice';
 import map from './slices/mapSlice';
@@ -11,7 +10,7 @@ import weather from './slices/weatherSlice';
 import workflow from './slices/workflowSlice';
 
 export const store = configureStore({
-  reducer: { auth, dashboard, incidents, reports, map, analytics, notifications, ui, weather, workflow },
+  reducer: { auth, incidents, reports, map, analytics, notifications, ui, weather, workflow },
 });
 
 export type RootState = ReturnType<typeof store.getState>;

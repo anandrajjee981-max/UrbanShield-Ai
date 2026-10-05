@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ShieldCheck, LogIn } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { loginUser, clearAuthError } from '../store/slices/authSlice';
+import { homeForRole } from '../utils/roleHome';
 import { popIn } from '../animations/gsap';
 import { useEffect } from 'react';
 
@@ -13,7 +14,7 @@ export default function Login() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, loading, error } = useAppSelector((s) => s.auth);
+  const { isAuthenticated, user, loading, error } = useAppSelector((s) => s.auth);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -22,12 +23,17 @@ export default function Login() {
   useEffect(() => { popIn('.auth-card'); }, []);
   useEffect(() => () => { dispatch(clearAuthError()); }, [dispatch]);
 
-  if (isAuthenticated) return <Navigate to={from} replace />;
+  if (isAuthenticated) return <Navigate to={user ? homeForRole(user.role) : from} replace />;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const res = await dispatch(loginUser({ email, password }));
-    if (loginUser.fulfilled.match(res)) navigate(from, { replace: true });
+    if (loginUser.fulfilled.match(res)) {
+      // Deep-link (`from`) wins unless it was the generic dashboard —
+      // that always resolves to the role home (citizen / authority / admin).
+      const dest = from === '/dashboard' ? homeForRole(res.payload.role) : from;
+      navigate(dest, { replace: true });
+    }
   };
 
   return (
@@ -66,7 +72,7 @@ export default function Login() {
           New here? <Link to="/register" className="font-bold text-brand">Create an account</Link>
         </p>
         <p className="text-[11px] text-center text-mute mt-2">
-          <Link to="/" className="underline">← Back to Home</Link> · POST /api/auth/login — session is an HTTP-only cookie.
+          <Link to="/" className="underline">← Back to Home</Link>
         </p>
       </div>
     </div>

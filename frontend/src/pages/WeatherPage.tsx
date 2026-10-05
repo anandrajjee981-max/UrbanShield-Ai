@@ -1,11 +1,15 @@
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, RefreshCw, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, LocateFixed, MapPin, RefreshCw, ShieldCheck } from 'lucide-react';
 import { ThreeDayForecast } from '../components/weather/ForecastCard';
 import TemperatureTrend from '../components/weather/TemperatureTrend';
 import { WeatherError, WeatherSkeleton } from '../components/weather/WeatherStates';
 import WeatherRiskCard from '../components/weather/WeatherRiskCard';
 import WeatherSearch from '../components/weather/WeatherSearch';
 import { useWeather } from '../hooks/useWeather';
+import { useLiveLocation } from '../hooks/useLiveLocation';
+import { useAppDispatch } from '../store/hooks';
+import { fetchWeather } from '../store/slices/weatherSlice';
 
 function lastUpdatedLabel(iso: string | null): string {
   if (!iso) return '';
@@ -19,6 +23,7 @@ function lastUpdatedLabel(iso: string | null): string {
 
 export default function WeatherPage() {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const {
     location,
     timezoneOffset,
@@ -29,6 +34,41 @@ export default function WeatherPage() {
     searchCity,
     refresh,
   } = useWeather();
+  const loc = useLiveLocation();
+  // Manual city search wins — stop auto-applying live coords after it.
+  const userSearched = useRef(false);
+  // Set on explicit "Live Location" taps so the next GPS/IP fix forces a
+  // weather fetch even when it is within ~5km of the displayed city.
+  const liveRequested = useRef(false);
+
+  // Dynamic weather: when live GPS/IP coords arrive, load weather for them
+  // instead of staying stuck on the default city. Runs once per fix —
+  // no interval, no focus listener (auto-refresh was removed on purpose).
+  useEffect(() => {
+    if (loc.locating || loading) return;
+    if (loc.source !== 'gps' && loc.source !== 'ip') return;
+    if (userSearched.current && !liveRequested.current) return;
+    const cur = location;
+    const close =
+      !!cur &&
+      Math.abs(cur.latitude - loc.lat) < 0.05 &&
+      Math.abs(cur.longitude - loc.lon) < 0.05;
+    // Skip silent near-identical fixes, but always honour an explicit tap.
+    if (close && !liveRequested.current) return;
+    liveRequested.current = false;
+    dispatch(fetchWeather({ lat: loc.lat, lon: loc.lon, refresh: close }));
+  }, [dispatch, loc.lat, loc.lon, loc.source, loc.locating, loading, location]);
+
+  const handleSearch = (city: string) => {
+    userSearched.current = true;
+    searchCity(city);
+  };
+
+  const goLive = () => {
+    userSearched.current = false;
+    liveRequested.current = true;
+    loc.retryGps();
+  };
 
   return (
     <div className="min-h-screen bg-canvas text-ink">
@@ -70,15 +110,39 @@ export default function WeatherPage() {
                   'Weather Forecast'
                 )}
               </h1>
-              <p className="text-xs font-semibold text-mute mt-1">
-                {location
-                  ? `Lat ${location.latitude} · Lon ${location.longitude}`
-                  : 'Live 3-day outlook powered by OpenWeatherMap'}
-                {lastUpdated && ` · Last updated ${lastUpdatedLabel(lastUpdated)}`}
+              <p className="text-xs font-semibold text-mute mt-1 flex items-center gap-1.5 flex-wrap">
+                {location ? (
+                  <span>{`Lat ${location.latitude} · Lon ${location.longitude}`}</span>
+                ) : (
+                  <span>Live 3-day outlook powered by OpenWeatherMap</span>
+                )}
+                {(loc.source === 'gps' || loc.source === 'ip') && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-soft text-brand uppercase tracking-wide">
+                    {loc.source === 'gps' ? 'GPS live' : 'IP location'}
+                  </span>
+                )}
+                {(loc.source === 'default' || loc.source === 'city') && location && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-canvas border border-line text-mute uppercase tracking-wide">
+                    Default city — tap Live Location or search your city
+                  </span>
+                )}
+                {lastUpdated && <span>· Last updated {lastUpdatedLabel(lastUpdated)}</span>}
               </p>
+              {loc.error && (
+                <p className="text-[11px] font-semibold text-brand mt-1">{loc.error}</p>
+              )}
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              <WeatherSearch loading={loading} onSearch={searchCity} />
+              <WeatherSearch loading={loading} onSearch={handleSearch} />
+              <button
+                onClick={goLive}
+                disabled={loc.locating}
+                title="Load weather for my live location"
+                className="inline-flex items-center justify-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-xl bg-brand text-white hover:bg-brand-warm disabled:opacity-50 shrink-0"
+              >
+                <LocateFixed size={15} className={loc.locating ? 'animate-pulse' : ''} />
+                {loc.locating ? 'Locating…' : 'Live Location'}
+              </button>
               <button
                 onClick={refresh}
                 disabled={loading}

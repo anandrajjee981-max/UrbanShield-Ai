@@ -8,8 +8,9 @@ export interface Incident {
   category: IncidentCategory;
   severity: Severity;
   status: IncidentStatus;
-  lat: number;
-  lng: number;
+  /** Null for MANUAL-address reports (backend has no coordinates for them) — never faked. */
+  lat: number | null;
+  lng: number | null;
   address: string;
   reportedAt: string;
   reporter: string;
@@ -33,6 +34,8 @@ export interface CitizenReport {
   locationType?: 'GPS' | 'MANUAL';
   /** Raw backend lifecycle status for the workflow tracker. */
   rawStatus?: 'REPORTED' | 'VERIFIED' | 'REJECTED' | 'ASSIGNED' | 'IN_PROGRESS' | 'RESOLVED';
+  /** ISO timestamp set by the backend when the issue reached RESOLVED (null otherwise). */
+  resolvedAt?: string | null;
   /** AI briefing once the issue is analysed (null until VERIFIED + analysed). */
   skillRequired?: string | null;
   complexity?: string | null;
@@ -66,6 +69,8 @@ export interface RiskDistribution {
   color: string;
 }
 
+export type NotificationCategory = 'REPORT' | 'INCIDENT' | 'AUTHORITY ACTION' | 'SYSTEM';
+
 export interface AppNotification {
   id: string;
   title: string;
@@ -73,6 +78,10 @@ export interface AppNotification {
   type: 'info' | 'warning' | 'critical' | 'success';
   time: string;
   read: boolean;
+  /** Grouping shown in the notification center. Defaults to SYSTEM. */
+  category?: NotificationCategory;
+  /** In-app route opened when the notification is clicked. */
+  link?: string;
 }
 
 export interface DashboardKpi {

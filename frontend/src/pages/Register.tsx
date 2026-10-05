@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { ShieldCheck, UserPlus } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { registerUser, clearAuthError } from '../store/slices/authSlice';
+import { homeForRole } from '../utils/roleHome';
 import { popIn } from '../animations/gsap';
 
 const inputCls =
@@ -20,13 +21,13 @@ export default function Register() {
   useEffect(() => { popIn('.auth-card'); }, []);
   useEffect(() => () => { dispatch(clearAuthError()); }, [dispatch]);
 
-  // A freshly registered user is already authenticated → straight to dashboard
+  // A freshly registered user is already authenticated → straight to role home
   if (isAuthenticated) return <Navigate to="/dashboard" replace />;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const res = await dispatch(registerUser({ name, email, password, role }));
-    if (registerUser.fulfilled.match(res)) navigate('/dashboard', { replace: true });
+    if (registerUser.fulfilled.match(res)) navigate(homeForRole(res.payload.role), { replace: true });
   };
 
   return (
@@ -92,7 +93,7 @@ export default function Register() {
           Already registered? <Link to="/login" className="font-bold text-brand">Login</Link>
         </p>
         <p className="text-[11px] text-center text-mute mt-2">
-          <Link to="/" className="underline">← Back to Home</Link> · POST /api/auth/register — session is an HTTP-only cookie.
+          <Link to="/" className="underline">← Back to Home</Link>
         </p>
       </div>
     </div>

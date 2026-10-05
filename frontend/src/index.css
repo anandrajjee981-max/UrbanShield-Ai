@@ -85,7 +85,23 @@
 }
 
 html, body, #root { height: 100%; }
+html { scroll-behavior: smooth; }
 body { margin: 0; background: var(--canvas); color: var(--ink); font-family: ui-sans-serif, system-ui, sans-serif; }
+
+/* Visible keyboard focus project-wide — except on borderless inputs that
+   delegate focus indication to their container via :focus-within
+   (e.g. the navbar search keeps a single container border). */
+:focus-visible:not(.no-focus-outline) { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* Respect users who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
 
 /* Pointer cursor on every clickable element project-wide. */
 button:not(:disabled),

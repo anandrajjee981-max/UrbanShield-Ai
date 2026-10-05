@@ -1,13 +1,14 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { mockRiskZones } from '../../data/mockRiskData';
-import { mockIncidents } from '../../data/mockIncidents';
 import { fetchMyIssuesRequest, type BackendSafeIssue } from '../../services/api';
 import type { Incident, IncidentStatus, Severity } from '../../types';
 import { backendTypeToCategory } from './reportsSlice';
 
 export const fetchMapData = createAsyncThunk('map/fetch', async () => {
   await new Promise((r) => setTimeout(r, 300));
-  return { zones: mockRiskZones, incidents: mockIncidents };
+  // Risk zones have no backend endpoint yet, so the demo zone layer stays.
+  // Incident markers are 100% live (see useMapIncidents) — no mock markers.
+  return { zones: mockRiskZones, incidents: [] as Incident[] };
 });
 
 const statusToSeverity = (s: BackendSafeIssue['status']): Severity => {
@@ -63,7 +64,7 @@ export const fetchRealMapReports = createAsyncThunk('map/fetchReal', async () =>
 
 interface MapState {
   zones: typeof mockRiskZones;
-  incidents: typeof mockIncidents;
+  incidents: Incident[];
   /** Live markers from the backend (user's own reports). */
   realIncidents: Incident[];
   showRiskLayers: boolean;

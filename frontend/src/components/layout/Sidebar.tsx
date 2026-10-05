@@ -5,16 +5,40 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { closeMobileMenu } from '../../store/slices/uiSlice';
 import { logoutThunk } from '../../store/slices/authSlice';
 
-const links = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] as const },
-  { to: '/map', label: 'City Map', icon: Map, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] as const },
-  { to: '/incidents', label: 'Incidents', icon: AlertTriangle, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] as const },
-  { to: '/reports', label: 'Reports', icon: FileText, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] as const },
-  { to: '/admin', label: 'Admin Review', icon: ClipboardCheck, roles: ['ADMIN'] as const },
-  { to: '/tasks', label: 'My Tasks', icon: Briefcase, roles: ['AUTHORITY'] as const },
-  { to: '/analytics', label: 'Analytics', icon: BarChart3, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] as const },
-  { to: '/ai', label: 'AI Insights', icon: Bot, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] as const },
-  { to: '/emergency', label: 'Emergency', icon: Siren, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] as const },
+interface Link { to: string; label: string; icon: typeof Map; end?: boolean; roles: readonly string[]; }
+
+const SECTIONS: { label: string; links: Link[] }[] = [
+  {
+    label: 'Overview',
+    links: [
+      { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true, roles: ['CITIZEN'] },
+      { to: '/authority', label: 'Dashboard', icon: LayoutDashboard, end: true, roles: ['AUTHORITY'] },
+      { to: '/admin-dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true, roles: ['ADMIN'] },
+      { to: '/map', label: 'City Map', icon: Map, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] },
+    ],
+  },
+  {
+    label: 'Monitor',
+    links: [
+      { to: '/incidents', label: 'Incidents', icon: AlertTriangle, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] },
+      { to: '/reports', label: 'Reports', icon: FileText, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] },
+      { to: '/admin', label: 'Admin Review', icon: ClipboardCheck, roles: ['ADMIN'] },
+    ],
+  },
+  {
+    label: 'Operations',
+    links: [
+      { to: '/tasks', label: 'My Tasks', icon: Briefcase, roles: ['AUTHORITY'] },
+      { to: '/emergency', label: 'Emergency', icon: Siren, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] },
+    ],
+  },
+  {
+    label: 'Intelligence',
+    links: [
+      { to: '/analytics', label: 'Analytics', icon: BarChart3, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] },
+      { to: '/ai', label: 'AI Insights', icon: Bot, roles: ['CITIZEN', 'AUTHORITY', 'ADMIN'] },
+    ],
+  },
 ];
 
 export default function Sidebar() {
@@ -25,7 +49,6 @@ export default function Sidebar() {
   const user = useAppSelector((s) => s.auth.user);
   const role = user?.role ?? 'CITIZEN';
   const close = () => dispatch(closeMobileMenu());
-  const visible = links.filter((l) => (l.roles as readonly string[]).includes(role));
   const expanded = open || mobile;
   const initials = (user?.name ?? 'U').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
   const [profileOpen, setProfileOpen] = useState(false);
@@ -38,13 +61,14 @@ export default function Sidebar() {
     return () => window.removeEventListener('keydown', onKey);
   }, [profileOpen]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setProfileOpen(false);
-    // Same order as Topbar: navigate first while authenticated, then clear session.
     navigate('/', { replace: true });
     dispatch(closeMobileMenu());
-    dispatch(logoutThunk());
+    await dispatch(logoutThunk());
+    navigate('/', { replace: true });
   };
+
   return (
     <>
       {/* Backdrop: tap outside the drawer to close it (mobile/tablet only) */}
@@ -60,13 +84,36 @@ export default function Sidebar() {
           <ShieldCheck className="text-tag shrink-0" size={26} />
           {(open || mobile) && <div className="min-w-0"><p className="font-bold leading-none truncate">UrbanShieldAI</p><p className="text-[11px] text-slate-400">City Resilience</p></div>}
         </div>
-        <nav className="p-3 space-y-1 flex-1 overflow-y-auto">
-          {visible.map((l) => (
-            <NavLink key={l.to} to={l.to} end={l.end} onClick={close}
-              className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${isActive ? 'bg-brand text-white' : 'text-slate-300 hover:bg-white/10'}`}>
-              <l.icon size={18} className="shrink-0" />{(open || mobile) && <span className="truncate">{l.label}</span>}
-            </NavLink>
-          ))}
+        <nav className="p-3 space-y-3 flex-1 overflow-y-auto" aria-label="Main navigation">
+          {SECTIONS.map((section) => {
+            const visible = section.links.filter((l) => (l.roles as readonly string[]).includes(role));
+            if (visible.length === 0) return null;
+            return (
+              <div key={section.label}>
+                {(open || mobile) && (
+                  <p className="px-3 mb-1 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
+                    {section.label}
+                  </p>
+                )}
+                <div className="space-y-1">
+                  {visible.map((l) => (
+                    <NavLink key={l.to} to={l.to} end={l.end} onClick={close}
+                      className={({ isActive }) => `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 hover:translate-x-1 active:translate-x-0 active:scale-[0.98] ${isActive ? 'bg-brand text-white shadow-lg shadow-brand/30' : 'text-slate-300 hover:bg-white/25 hover:text-white hover:shadow-md'}`}>
+                      {({ isActive }) => (
+                        <>
+                          {isActive && (
+                            <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-full bg-white/90" />
+                          )}
+                          <l.icon size={18} className={`shrink-0 transition-transform duration-200 group-hover:scale-110 ${isActive ? 'text-white' : ''}`} />
+                          {(open || mobile) && <span className="truncate">{l.label}</span>}
+                        </>
+                      )}
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </nav>
         {/* Logged-in user card — click opens the profile popup */}
         {user ? (

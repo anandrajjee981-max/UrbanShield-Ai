@@ -85,6 +85,7 @@ export function backendIssueToReport(issue: BackendSafeIssue): CitizenReport {
     imageUrl: issue.imageUrl ?? undefined,
     locationType: issue.locationType,
     rawStatus: issue.status,
+    resolvedAt: issue.resolvedAt,
     skillRequired: issue.skillRequired,
     complexity: issue.complexity,
     effortHours: issue.effortHours,

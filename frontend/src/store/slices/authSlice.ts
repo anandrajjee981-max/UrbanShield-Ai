@@ -150,6 +150,20 @@ const slice = createSlice({
       s.isAuthenticated = false;
       s.user = null;
       s.error = null;
+      // Session is now definitively logged out — keep the boot gate open
+      // so ProtectedRoute redirects (until the logout handler navigates home).
+      s.sessionLoading = false;
+      s.sessionChecked = true;
+    });
+    b.addCase(logoutThunk.rejected, (s) => {
+      // Never leave `loading` stuck; treat a failed logout as logged out
+      // locally so the user still lands on Home instead of hanging.
+      s.loading = false;
+      s.isAuthenticated = false;
+      s.user = null;
+      s.error = null;
+      s.sessionLoading = false;
+      s.sessionChecked = true;
     });
   },
 });
