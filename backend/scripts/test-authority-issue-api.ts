@@ -7,6 +7,7 @@ import { AUTH_COOKIE_NAME } from '../src/config/auth-cookie.js';
 
 const BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:4000';
 const PASSWORD = 'password123';
+const UNKNOWN_UUID = '00000000-0000-0000-0000-00000000dead';
 
 const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
@@ -15,10 +16,7 @@ const dataOf = (json: unknown): Record<string, unknown> => asRecord(asRecord(jso
 
 const uniqueEmail = (prefix: string): string => `${prefix}.${Date.now()}.${Math.floor(Math.random()*1e6)}@example.com`;
 
-const check = (label: string, condition: boolean, actual: unknown): void => {
-  if (!condition) throw new Error(`FAIL ${label}: ${String(actual)}`);
-  console.log(`PASS ${label}`);
-};
+const isTimestamp = (value: unknown): boolean => typeof value === 'string' && Number.isFinite(Date.parse(value));
 
 interface Session {
   request: (m: string, p: string, b?: unknown) => Promise<{status:number,json:unknown,raw:string}>;
@@ -91,7 +89,7 @@ const createVerifiedAuthority = async () => {
   const ar = await admin.request('POST','/api/auth/register',{name:'M',email:am,password:PASSWORD,role:'CITIZEN'});
   const auid = asRecord(dataOf(ar.json).user).id as string; await query('UPDATE users SET role=$1 WHERE id=$2',['ADMIN',auid]);
   await login(admin, am);
-  await auth.requestMultipart('POST','/api/authority/application',
+  const app = await auth.requestMultipart('POST','/api/authority/application',
     {fullName:'A',dateOfBirth:'1990-01-01',phone:'9876543210',email:ae,address:'X',governmentIdType:'AADHAAR',governmentIdNumber:'123456789012',department:'WATER_MANAGEMENT',designation:'FIELD_OFFICER',skills:'PLUMBING',jurisdictionType:'WARD',jurisdictionName:'W1',availability:'AVAILABLE'},
     {field:'document',filename:'p.png',type:'image/png',bytes:PNG}
   );
@@ -125,19 +123,6 @@ async function main() {
   // reject i2
   r = await auth.request('PATCH',`/api/authority/issues/${i2}/reject`,{reason:'bad'});
   if (r.status===200) console.log('PASS reject'); else console.log('FAIL reject',r.status);
-  // An unverified AUTHORITY can also review issues.
-  const candidate = createSession();
-  await register(candidate,'Candidate','AUTHORITY');
-  const i3 = await createIssue(citizen,'Candidate verify');
-  const i4 = await createIssue(citizen,'Candidate reject');
-  r = await candidate.request('GET','/api/authority/issues');
-  check('unverified authority can list issues',r.status===200,r.status);
-  r = await candidate.request('GET',`/api/authority/issues/${i3}`);
-  check('unverified authority can read issue details',r.status===200,r.status);
-  r = await candidate.request('PATCH',`/api/authority/issues/${i3}/verify`,{});
-  check('unverified authority can verify issues',r.status===200,r.status);
-  r = await candidate.request('PATCH',`/api/authority/issues/${i4}/reject`,{reason:'candidate review'});
-  check('unverified authority can reject issues',r.status===200,r.status);
   // citizen cannot access
   r = await citizen.request('GET','/api/authority/issues');
   if (r.status===403) console.log('PASS forbid citizen'); else console.log('FAIL forbid citizen',r.status);

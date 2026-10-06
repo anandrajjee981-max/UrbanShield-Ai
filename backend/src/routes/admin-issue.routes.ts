@@ -16,7 +16,7 @@ import type { UserRole } from '../types/auth.types.js';
  *
  * This router is read-only, and that is deliberate: verifying and rejecting
  * citizen issues is an authority responsibility, and it lives in
- * routes/authority-issue.routes.ts behind the AUTHORITY role guard.
+ * routes/authority-issue.routes.ts behind `requireVerifiedAuthority()`.
  *
  * There is no `PATCH /:issueId/verify`, no `/reject`, and no free-form
  * `PATCH /:issueId` with a `status` field, so there is no admin endpoint from which
