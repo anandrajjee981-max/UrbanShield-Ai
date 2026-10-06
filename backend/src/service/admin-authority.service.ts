@@ -123,9 +123,9 @@ export const getAuthorityApplicationForReview = async (
  * confirm that an id exists.
  */
 export const getAuthorityAuditTrail = async (applicationId: string): Promise<AuthorityAuditEntry[]> => {
-  await requireApplication(applicationId);
+  const application = await requireApplication(applicationId);
 
-  return authorityDao.findAuthorityAuditTrail(applicationId);
+  return authorityDao.findAuthorityAuditTrail(application.id);
 };
 
 /**

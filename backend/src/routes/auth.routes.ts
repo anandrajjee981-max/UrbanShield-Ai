@@ -33,6 +33,11 @@ authRouter.post('/login', credentialsLimiter, validateBody(loginSchema), authCon
 
 authRouter.get('/me', authenticate, authController.getMe);
 
-authRouter.post('/logout', authenticate, authController.logout);
+/**
+ * Logout must NOT require `authenticate`: with an expired/invalid cookie the
+ * guard would 401 before `clearCookie` runs and the dead cookie could never
+ * be cleared. Clearing a cookie is always safe.
+ */
+authRouter.post('/logout', authController.logout);
 
 export default authRouter;

@@ -45,24 +45,34 @@ export const issueIdSchema = z.uuid('Issue id must be a valid UUID');
 /**
  * `GET /api/authority/issues` and `GET /api/admin/issues` query string.
  *
- * `status` is optional; without it the list shows every issue in the review stage,
- * newest first. The enum is deliberately narrower than ISSUE_STATUSES - only the
- * pending queue and the two review outcomes - so an arbitrary value (or a
- * `?status=IN_PROGRESS` probe for a stage that has no API yet) is a 400.
+ * Both `status` and `limit` are optional: without them the list shows every
+ * issue in the review stage, newest first, capped at ISSUE_LIST_MAX_LIMIT
+ * (the services apply those defaults via `??`). The enum is deliberately
+ * narrower than ISSUE_STATUSES - only the pending queue and the two review
+ * outcomes - so an arbitrary value (or a `?status=IN_PROGRESS` probe for a
+ * stage that has no API yet) is a 400.
  *
  * `.strict()` means an unknown query parameter is a validation error too, so a
  * typo such as `?states=REPORTED` cannot silently return the unfiltered list.
  */
 export const issueListQuerySchema = z
   .object({
-    status: z.enum(ISSUE_REVIEW_STATUSES, {
-      error: `Status must be one of: ${ISSUE_REVIEW_STATUSES.join(', ')}`,
-    }),
-    limit: z.coerce
-      .number({ error: 'Limit must be a number' })
-      .int('Limit must be a whole number')
-      .min(1, 'Limit must be at least 1')
-      .max(ISSUE_LIST_MAX_LIMIT, `Limit must be at most ${ISSUE_LIST_MAX_LIMIT}`),
+    status: z
+      .preprocess(
+        (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+        z.enum(ISSUE_REVIEW_STATUSES, {
+          error: `Status must be one of: ${ISSUE_REVIEW_STATUSES.join(', ')}`,
+        }),
+      )
+      .optional(),
+    limit: z.preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z.coerce
+        .number({ error: 'Limit must be a number' })
+        .int('Limit must be a whole number')
+        .min(1, 'Limit must be at least 1')
+        .max(ISSUE_LIST_MAX_LIMIT, `Limit must be at most ${ISSUE_LIST_MAX_LIMIT}`),
+    ).optional(),
   })
   .strict();
 

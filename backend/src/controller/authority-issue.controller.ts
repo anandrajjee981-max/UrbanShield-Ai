@@ -18,11 +18,10 @@ import { asyncHandler } from '../utils/async-handler.js';
  * particular the reviewer id is always `req.user.userId`: nothing in the request
  * body or query string can influence who the recorded authority is.
  *
- * The route mounts these handlers behind `authenticate` +
- * `requireRole('AUTHORITY')` + `requireVerifiedAuthority()`, so a CITIZEN, an
- * ADMIN, and an AUTHORITY that is only a candidate are all turned away before
- * reaching this file. The role check is repeated here as a fail-closed assertion,
- * mirroring controller/authority.controller.ts.
+ * The route mounts these handlers behind `authenticate` + `requireRole('AUTHORITY')`,
+ * so a CITIZEN or ADMIN is turned away before reaching this file. Authority
+ * application verification is not required for issue review. The role check is
+ * repeated here as a fail-closed assertion, mirroring controller/authority.controller.ts.
  */
 
 /**

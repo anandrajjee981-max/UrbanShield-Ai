@@ -3,10 +3,11 @@ import type { UploadedImageFile } from '../models/issue.model.js';
 import { ISSUE_IMAGE_FIELD } from '../middleware/upload.middleware.js';
 import * as issueService from '../service/issue.service.js';
 import type { CreateIssueRequest } from '../validation/issue.schema.js';
-import { BadRequestError, UnauthorizedError } from '../utils/api-error.js';
+import { issueIdSchema } from '../validation/issue-review.schema.js';
+import { BadRequestError, NotFoundError, UnauthorizedError } from '../utils/api-error.js';
 import { sendSuccess } from '../utils/api-response.js';
 import { asyncHandler } from '../utils/async-handler.js';
-import { deleteIssue } from '../dao/issue.dao.js';
+import { deleteOwnIssue } from '../dao/issue.dao.js';
 /**
  * HTTP layer for citizen issue reports.
  *
@@ -84,26 +85,34 @@ const uploadIssuePhotoHandler = async (req: Request, res: Response): Promise<voi
     imageFileId: image.imageFileId,
   });
 };
-export const deleteIssueHandler: RequestHandler<{ id: string }> = async (req, res) => {
+/**
+ * Deletes one of the caller's own reports.
+ *
+ * Ownership is enforced by the DAO (`WHERE id = $1 AND user_id = $2`): a
+ * caller can never delete another account's issue. A missing row is a 404
+ * whether the id does not exist or belongs to somebody else, so the endpoint
+ * cannot be used to probe other people's report ids.
+ */
+const deleteIssueHandlerRaw: RequestHandler<{ id: string }> = async (req, res) => {
   if (!req.user) {
     throw new UnauthorizedError('Authentication required', 'MISSING_TOKEN');
   }
 
-  const issueId = req.params.id;
+  // Malformed ids are a clean 400 instead of a PostgreSQL driver error.
+  const issueId = issueIdSchema.parse(req.params.id);
 
-  // Optionally, you could check if the issue belongs to the user before deleting
-  // const issue = await issueService.findIssueById(issueId);
-  // if (!issue || issue.userId !== req.user.userId) {
-  //   throw new UnauthorizedError('You do not have permission to delete this issue', 'FORBIDDEN');
-  // }
+  const deleted = await deleteOwnIssue(issueId, req.user.userId);
 
-  await deleteIssue(issueId);
+  if (!deleted) {
+    throw new NotFoundError('Issue not found', 'ISSUE_NOT_FOUND');
+  }
 
   sendSuccess(res, 200, 'Issue deleted successfully', { issueId });
-};  
+};
 
 
 
 export const createIssue = asyncHandler(createIssueHandler);
 export const listMyIssues = asyncHandler(listMyIssuesHandler);
 export const uploadIssuePhoto = asyncHandler(uploadIssuePhotoHandler);
+export const deleteIssueHandler = asyncHandler(deleteIssueHandlerRaw);

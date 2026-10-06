@@ -212,7 +212,10 @@ export const verifyIssue = async (id: string, authorityId: string): Promise<Auth
     `UPDATE issues
         SET status = $3,
             verified_by = $2,
-            verified_at = NOW()
+            verified_at = NOW(),
+            rejected_by = NULL,
+            rejected_at = NULL,
+            rejection_reason = NULL
       WHERE id = $1
         AND status = $4
       RETURNING ${ISSUE_REVIEW_COLUMNS}`,
@@ -243,7 +246,9 @@ export const rejectIssue = async (
         SET status = $3,
             rejected_by = $2,
             rejected_at = NOW(),
-            rejection_reason = COALESCE($5, rejection_reason)
+            rejection_reason = COALESCE($5, rejection_reason),
+            verified_by = NULL,
+            verified_at = NULL
       WHERE id = $1
         AND status = $4
       RETURNING ${ISSUE_REVIEW_COLUMNS}`,
@@ -255,8 +260,18 @@ export const rejectIssue = async (
   return row ? toAuthorityReviewIssue(row) : null;
 };
 
-export const deleteIssue = async (id: string): Promise<void> => {
-  await query('DELETE FROM issues WHERE id = $1', [id]);
+/**
+ * Deletes one citizen's own report.
+ *
+ * Ownership is enforced in SQL (`AND user_id = $2`), so a caller can never
+ * delete another account's issue, whatever the status. Returns true when a row
+ * was actually removed, so the service can turn "nothing deleted" into a 404
+ * instead of reporting a silent success.
+ */
+export const deleteOwnIssue = async (id: string, userId: string): Promise<boolean> => {
+  const { rowCount } = await query('DELETE FROM issues WHERE id = $1 AND user_id = $2', [id, userId]);
+
+  return (rowCount ?? 0) > 0;
 };
 
 
