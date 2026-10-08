@@ -1,6 +1,7 @@
 import type { Request, RequestHandler, Response } from 'express';
 import type { UploadedAuthorityDocument } from '../models/authority.model.js';
 import * as authorityService from '../service/authority.service.js';
+import * as assignmentService from '../service/assignment.service.js';
 import type { SubmitAuthorityApplicationRequest } from '../validation/authority.schema.js';
 import { ForbiddenError, UnauthorizedError } from '../utils/api-error.js';
 import { sendSuccess } from '../utils/api-response.js';
@@ -148,3 +149,24 @@ export const getMyApplication = asyncHandler(getMyApplicationHandler);
 export const submitApplication = asyncHandler(submitApplicationHandler);
 export const getApplicationOptions = asyncHandler(getApplicationOptionsHandler);
 export const getAuthorityProfile = asyncHandler(getAuthorityProfileHandler);
+
+/**
+ * GET /api/authority/tasks - the verified authority's assigned tasks.
+ *
+ * Read-only. The authority id is resolved from the authenticated user inside
+ * the service, so an authority can only ever see its own assignments; admin
+ * work items live in a separate table and can never appear in this list.
+ * `?status=` accepts only known task statuses (ASSIGNED, IN_PROGRESS,
+ * COMPLETED, CANCELLED) - anything else is ignored rather than rejected, so
+ * the dashboard can refresh without a hard failure on a stale filter.
+ */
+const listMyTasksHandler = async (req: Request, res: Response): Promise<void> => {
+  const userId = requireCandidate(req);
+
+  const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+  const tasks = await assignmentService.listMyTasks(userId, status);
+
+  sendSuccess(res, 200, 'Tasks retrieved', { tasks });
+};
+
+export const listMyTasks = asyncHandler(listMyTasksHandler);

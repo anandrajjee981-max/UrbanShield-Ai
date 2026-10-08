@@ -106,4 +106,20 @@ authorityRouter.get(
   authorityController.getAuthorityProfile,
 );
 
+/**
+ * GET /api/authority/tasks?status=ASSIGNED - the authority's own assignments.
+ *
+ * Behind `requireVerifiedAuthority`: a PENDING or REJECTED candidate gets a 403
+ * with AUTHORITY_NOT_VERIFIED, so unverified candidates can never see task data.
+ * Read-only - no transition endpoints here; task status changes are the
+ * authority module's future work, and admin work items are never returned.
+ */
+authorityRouter.get(
+  '/tasks',
+  authenticate,
+  requireRole(...CANDIDATE_ONLY),
+  requireVerifiedAuthority(),
+  authorityController.listMyTasks,
+);
+
 export default authorityRouter;

@@ -7,6 +7,7 @@ import { errorHandler, notFoundHandler } from './middleware/error.middleware.js'
 import authRoutes from './routes/auth.routes.js';
 import adminAuthorityRoutes from './routes/admin-authority.routes.js';
 import adminIssueRoutes from './routes/admin-issue.routes.js';
+import adminTaskRoutes from './routes/admin-task.routes.js';
 import authorityRoutes from './routes/authority.routes.js';
 import authorityIssueRoutes from './routes/authority-issue.routes.js';
 import issueRoutes from './routes/issue.routes.js';
@@ -81,6 +82,9 @@ app.use('/api/auth', authRoutes);
   app.use('/api/admin/authority-applications', adminAuthorityRoutes);
   // The admin's view of the same issues is monitoring only - GET, no transitions.
   app.use('/api/admin/issues', adminIssueRoutes);
+  // Admin "My Tasks": workflow failure work items (AI failure, no eligible
+  // authority, assignment failure). Read-only - items are backend-created only.
+  app.use('/api/admin/tasks', adminTaskRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

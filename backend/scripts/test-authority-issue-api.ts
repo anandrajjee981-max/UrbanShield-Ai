@@ -7,7 +7,6 @@ import { AUTH_COOKIE_NAME } from '../src/config/auth-cookie.js';
 
 const BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:4000';
 const PASSWORD = 'password123';
-const UNKNOWN_UUID = '00000000-0000-0000-0000-00000000dead';
 
 const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
@@ -15,8 +14,6 @@ const asRecord = (value: unknown): Record<string, unknown> =>
 const dataOf = (json: unknown): Record<string, unknown> => asRecord(asRecord(json).data);
 
 const uniqueEmail = (prefix: string): string => `${prefix}.${Date.now()}.${Math.floor(Math.random()*1e6)}@example.com`;
-
-const isTimestamp = (value: unknown): boolean => typeof value === 'string' && Number.isFinite(Date.parse(value));
 
 interface Session {
   request: (m: string, p: string, b?: unknown) => Promise<{status:number,json:unknown,raw:string}>;
@@ -89,7 +86,7 @@ const createVerifiedAuthority = async () => {
   const ar = await admin.request('POST','/api/auth/register',{name:'M',email:am,password:PASSWORD,role:'CITIZEN'});
   const auid = asRecord(dataOf(ar.json).user).id as string; await query('UPDATE users SET role=$1 WHERE id=$2',['ADMIN',auid]);
   await login(admin, am);
-  const app = await auth.requestMultipart('POST','/api/authority/application',
+  await auth.requestMultipart('POST','/api/authority/application',
     {fullName:'A',dateOfBirth:'1990-01-01',phone:'9876543210',email:ae,address:'X',governmentIdType:'AADHAAR',governmentIdNumber:'123456789012',department:'WATER_MANAGEMENT',designation:'FIELD_OFFICER',skills:'PLUMBING',jurisdictionType:'WARD',jurisdictionName:'W1',availability:'AVAILABLE'},
     {field:'document',filename:'p.png',type:'image/png',bytes:PNG}
   );

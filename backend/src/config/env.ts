@@ -86,6 +86,36 @@ const envSchema = z.object({
   ISSUE_UPLOAD_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(20),
 
   /**
+   * OpenRouter API key for the Watcher/Boss AI (LangGraph nodes).
+   *
+   * Optional on purpose, unlike the ImageKit keys: without it the Watcher
+   * reports WATCHER_UNAVAILABLE and every new issue simply stays REPORTED, so
+   * the rest of the API keeps working instead of refusing to boot. A blank
+   * value in .env is treated the same as an absent one. The key is server side
+   * only and is never logged or returned.
+   */
+  OPENROUTER_API_KEY: z.preprocess(
+    (value) =>
+      typeof value === 'string' && value.trim() === ''
+        ? undefined
+        : typeof value === 'string'
+          ? value.trim()
+          : value,
+    z.string().min(1, 'OPENROUTER_API_KEY must not be blank').optional(),
+  ),
+
+  /** Model the Watcher/Boss node talks to on OpenRouter. */
+  OPENROUTER_MODEL: z.string().trim().min(1, 'OPENROUTER_MODEL must not be blank').default('openai/gpt-4o-mini'),
+
+  /** Hard cap in milliseconds for one Watcher run. */
+  // Must absorb the node's 4 SDK retries (503 backoff) plus one full model
+  // call, otherwise a transient spike is reported as a timeout failure.
+  WATCHER_TIMEOUT_MS: z.coerce.number().int().positive().default(60000),
+
+  /** Hard cap in milliseconds for one Boss run. */
+  BOSS_TIMEOUT_MS: z.coerce.number().int().positive().default(60000),
+
+  /**
    * Upper bound for one uploaded government identity document, enforced by multer
    * before any byte is read from the socket.
    *
@@ -156,6 +186,9 @@ if (!parsedEnv.success) {
 export const env = parsedEnv.data;
 
 export type Env = typeof env;
+
+/** OpenRouter speaks the OpenAI chat-completions API; this is its base url. */
+export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
 /** Origins accepted by CORS (parsed from `FRONTEND_URL`). */
 export const FRONTEND_ORIGINS: readonly string[] = env.FRONTEND_URL;
