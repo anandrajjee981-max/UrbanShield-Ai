@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import AppLayout from './components/layout/AppLayout';
+import GlobalAISearch from './components/ai-search/GlobalAISearch';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import RoleRoute from './components/auth/RoleRoute';
 import AdminRoute from './components/auth/AdminRoute';
@@ -119,6 +120,8 @@ export default function App() {
   return (
     <BrowserRouter>
       <AppRoutes />
+      {/* Floating global AI search — mounted once, available on every page. */}
+      <GlobalAISearch />
     </BrowserRouter>
   );
 }
