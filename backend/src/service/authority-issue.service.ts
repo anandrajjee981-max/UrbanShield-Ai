@@ -21,8 +21,8 @@ import { ConflictError, InternalServerError, NotFoundError } from '../utils/api-
  *   REPORTED --(reject)--> REJECTED
  *
  * This is the *only* place in the backend where an issue status is written after
- * it is created. It used to be the admin's job; it is now an authority's, which
- * is why the service takes an `authorityId` and never an `adminId`.
+ * it is created. It used to be the admin's job; it is now a verified authority's,
+ * which is why the service takes an `authorityId` and never an `adminId`.
  *
  * Everything a client cannot decide is decided here:
  *
@@ -37,10 +37,11 @@ import { ConflictError, InternalServerError, NotFoundError } from '../utils/api-
  *  - What is reported back. 404 when the issue does not exist, 409 when it has
  *    already been processed.
  *
- * Route authentication and role checks enforce that only AUTHORITY accounts can
- * review issues. Application verification is not required for this workflow.
- * Nothing here reads a status from a request, so a client cannot forge an issue
- * transition.
+ * What a caller must *not* decide is enforced one layer up: whether the session
+ * is a VERIFIED authority at all is settled by `requireVerifiedAuthority`
+ * (src/middleware/authority.middleware.ts), which reads the verification status
+ * from the database rather than from the JWT. Nothing here reads a status from a
+ * request, so a client cannot talk its way past that guard.
  *
  * Nothing else belongs here: no SQL (that is the DAO), no HTTP concerns (that is
  * the controller) and deliberately no AI analysis, effort estimation, authority
@@ -141,12 +142,11 @@ const reviewIssue = async (
 /**
  * The authority issue queue, newest first.
  *
- * Without a `status` filter this lists every issue in the review stage
- * (REPORTED, VERIFIED, REJECTED), with nobody assigned in particular.
- * Assignment is a later module, so there is no `assignedTo` column, no
- * per-authority filter and no claim step here - an authority reviews whatever
- * is reported and the outcome is what moves the issue on. Pass
- * `?status=REPORTED` for the "Pending Issues" view.
+ * Without a `status` filter this is the dashboard's "Pending Issues" list: every
+ * REPORTED issue, with nobody assigned in particular. Assignment is a later
+ * module, so there is no `assignedTo` column, no per-authority filter and no claim
+ * step here - an authority reviews whatever is reported and the outcome is what
+ * moves the issue on.
  *
  * The status filter and the page size come from `issueListQuerySchema`, so an
  * unknown status, a non numeric limit or an unknown query parameter is a 400
@@ -178,7 +178,7 @@ export const getIssueForReview = async (issueId: string): Promise<AuthorityRevie
  * REPORTED -> VERIFIED.
  *
  * The request body is not used for anything: the endpoint itself decides the
- * transition and the reviewer, and the caller must already have the AUTHORITY role
+ * transition and the reviewer, and the caller must already be a verified authority
  * (see the route guards). 409 when the issue is already VERIFIED, already
  * REJECTED or in any later stage.
  */

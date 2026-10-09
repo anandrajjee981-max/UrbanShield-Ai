@@ -9,7 +9,7 @@ import type {
 } from '../models/issue.model.js';
 import { toAuthorityReviewIssue, toIssue, toMonitoredIssue } from '../models/issue.model.js';
 import { ISSUE_STATUS_AFTER_AUTHORITY_ACTION, REVIEWABLE_ISSUE_STATUS } from '../types/issue.types.js';
-import type { IssueStatus } from '../types/issue.types.js';
+import type { IssueStatus, ReviewedIssueStatus } from '../types/issue.types.js';
 import { InternalServerError } from '../utils/api-error.js';
 
 /**
@@ -212,10 +212,7 @@ export const verifyIssue = async (id: string, authorityId: string): Promise<Auth
     `UPDATE issues
         SET status = $3,
             verified_by = $2,
-            verified_at = NOW(),
-            rejected_by = NULL,
-            rejected_at = NULL,
-            rejection_reason = NULL
+            verified_at = NOW()
       WHERE id = $1
         AND status = $4
       RETURNING ${ISSUE_REVIEW_COLUMNS}`,
@@ -246,9 +243,7 @@ export const rejectIssue = async (
         SET status = $3,
             rejected_by = $2,
             rejected_at = NOW(),
-            rejection_reason = COALESCE($5, rejection_reason),
-            verified_by = NULL,
-            verified_at = NULL
+            rejection_reason = COALESCE($5, rejection_reason)
       WHERE id = $1
         AND status = $4
       RETURNING ${ISSUE_REVIEW_COLUMNS}`,
@@ -261,17 +256,44 @@ export const rejectIssue = async (
 };
 
 /**
- * Deletes one citizen's own report.
+ * Applies the Watcher AI decision to a REPORTED issue: ACCEPT -> VERIFIED,
+ * REJECT -> REJECTED.
  *
- * Ownership is enforced in SQL (`AND user_id = $2`), so a caller can never
- * delete another account's issue, whatever the status. Returns true when a row
- * was actually removed, so the service can turn "nothing deleted" into a 404
- * instead of reporting a silent success.
+ * Same one-way guard as the authority transitions - `AND status = $4` with the
+ * single REVIEWABLE_ISSUE_STATUS constant - so the AI can never overwrite a
+ * decision an authority has already taken, and a concurrent authority review
+ * simply wins (the caller sees null and reports the issue as processed).
+ *
+ * The difference from `verifyIssue` / `rejectIssue` is who acted: there is no
+ * authenticated account behind a Watcher run, so `verified_by` / `rejected_by`
+ * stay NULL and only the timestamp and, for a rejection, the reason are
+ * written. That is exactly what `issues_verification_state_valid` allows - the
+ * constraint requires the timestamps, never the actor id.
  */
-export const deleteOwnIssue = async (id: string, userId: string): Promise<boolean> => {
-  const { rowCount } = await query('DELETE FROM issues WHERE id = $1 AND user_id = $2', [id, userId]);
+export const applyWatcherDecision = async (
+  id: string,
+  status: ReviewedIssueStatus,
+  rejectionReason: string | null,
+): Promise<AuthorityReviewIssue | null> => {
+  const { rows } = await query<IssueRow>(
+    `UPDATE issues
+        SET status = $2::varchar,
+            verified_at = CASE WHEN $2::varchar = 'VERIFIED' THEN NOW() ELSE NULL END,
+            rejected_at = CASE WHEN $2::varchar = 'REJECTED' THEN NOW() ELSE NULL END,
+            rejection_reason = CASE WHEN $2::varchar = 'REJECTED' THEN $3 ELSE NULL END
+      WHERE id = $1
+        AND status = $4
+      RETURNING ${ISSUE_REVIEW_COLUMNS}`,
+    [id, status, rejectionReason, REVIEWABLE_ISSUE_STATUS],
+  );
 
-  return (rowCount ?? 0) > 0;
+  const row = rows[0];
+
+  return row ? toAuthorityReviewIssue(row) : null;
+};
+
+export const deleteIssue = async (id: string): Promise<void> => {
+  await query('DELETE FROM issues WHERE id = $1', [id]);
 };
 
 

@@ -15,11 +15,6 @@ const dataOf = (json: unknown): Record<string, unknown> => asRecord(asRecord(jso
 
 const uniqueEmail = (prefix: string): string => `${prefix}.${Date.now()}.${Math.floor(Math.random()*1e6)}@example.com`;
 
-const check = (label: string, condition: boolean, actual: unknown): void => {
-  if (!condition) throw new Error(`FAIL ${label}: ${String(actual)}`);
-  console.log(`PASS ${label}`);
-};
-
 interface Session {
   request: (m: string, p: string, b?: unknown) => Promise<{status:number,json:unknown,raw:string}>;
   requestAnonymous: (m: string, p: string, b?: unknown) => Promise<{status:number,json:unknown,raw:string}>;
@@ -125,19 +120,6 @@ async function main() {
   // reject i2
   r = await auth.request('PATCH',`/api/authority/issues/${i2}/reject`,{reason:'bad'});
   if (r.status===200) console.log('PASS reject'); else console.log('FAIL reject',r.status);
-  // An unverified AUTHORITY can also review issues.
-  const candidate = createSession();
-  await register(candidate,'Candidate','AUTHORITY');
-  const i3 = await createIssue(citizen,'Candidate verify');
-  const i4 = await createIssue(citizen,'Candidate reject');
-  r = await candidate.request('GET','/api/authority/issues');
-  check('unverified authority can list issues',r.status===200,r.status);
-  r = await candidate.request('GET',`/api/authority/issues/${i3}`);
-  check('unverified authority can read issue details',r.status===200,r.status);
-  r = await candidate.request('PATCH',`/api/authority/issues/${i3}/verify`,{});
-  check('unverified authority can verify issues',r.status===200,r.status);
-  r = await candidate.request('PATCH',`/api/authority/issues/${i4}/reject`,{reason:'candidate review'});
-  check('unverified authority can reject issues',r.status===200,r.status);
   // citizen cannot access
   r = await citizen.request('GET','/api/authority/issues');
   if (r.status===403) console.log('PASS forbid citizen'); else console.log('FAIL forbid citizen',r.status);

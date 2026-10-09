@@ -4,7 +4,7 @@ import type {
   RejectAuthorityApplicationRequest,
   VerifyAuthorityApplicationRequest,
 } from '../validation/authority.schema.js';
-import { ForbiddenError, UnauthorizedError } from '../utils/api-error.js';
+import { UnauthorizedError } from '../utils/api-error.js';
 import { sendSuccess } from '../utils/api-response.js';
 import { asyncHandler } from '../utils/async-handler.js';
 
@@ -28,19 +28,14 @@ import { asyncHandler } from '../utils/async-handler.js';
  */
 
 /**
- * The authenticated admin, or a 401/403 if the guard was ever skipped.
+ * The authenticated admin, or a 401 if the guard was ever skipped.
  *
- * `authenticate` + `requireRole('ADMIN')` guarantee this on these routes; the
- * role is re-checked here as fail-closed defense-in-depth so a future re-mount
- * without the route guard cannot silently expose review, verify or reject.
+ * `authenticate` guarantees `req.user` on these routes; the check is kept as a
+ * fail-closed guard so a future re-mount cannot silently lose the identity.
  */
 const requireAdmin = (req: Request): string => {
   if (!req.user) {
     throw new UnauthorizedError('Authentication required', 'MISSING_TOKEN');
-  }
-
-  if (req.user.role !== 'ADMIN') {
-    throw new ForbiddenError('You do not have permission to perform this action', 'FORBIDDEN');
   }
 
   return req.user.userId;

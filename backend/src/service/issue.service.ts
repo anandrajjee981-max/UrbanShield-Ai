@@ -1,4 +1,5 @@
 import * as issueDao from '../dao/issue.dao.js';
+import { triggerWorkflow } from '../ai/services/workflow.service.js';
 import type { IssueImageUpload } from '../config/imagekit.js';
 import * as imageService from './image.service.js';
 import type { CreateIssueData, Issue, SafeIssue, UploadedImageFile } from '../models/issue.model.js';
@@ -121,6 +122,13 @@ export const createIssue = async (params: CreateIssueParams): Promise<SafeIssue>
     // REPORTED. Reported as a 500 because it is our bug, not the caller's.
     throw new InternalServerError('Issue was created with an unexpected status', 'UNEXPECTED_ISSUE_STATUS');
   }
+
+  // Background AI workflow: Watcher -> Boss -> Assignment, with failure
+  // recovery (an AI failure creates an admin work item and never rejects the
+  // issue). Deliberately fire-and-forget - the response above is already
+  // decided by the row, so a slow or dead AI provider can neither delay nor
+  // fail a citizen's report.
+  triggerWorkflow(issue.id);
 
   return toSafeIssue(issue);
 };

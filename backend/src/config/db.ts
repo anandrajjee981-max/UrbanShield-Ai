@@ -32,8 +32,9 @@ if (!hasGlobalIPv6) {
  * PostgreSQL connection pool.
  *
  * Works with Neon PostgreSQL: the connection string already carries
- * `sslmode=require`, which `pg` translates into a TLS enabled connection, so no
- * credentials or host are hardcoded anywhere in this project.
+ * `sslmode=verify-full`, which `pg` turns into a TLS connection with full
+ * certificate verification, so no credentials or host are hardcoded anywhere in
+ * this project.
  */
 export const pool = new Pool({
   connectionString: env.DATABASE_URL,
