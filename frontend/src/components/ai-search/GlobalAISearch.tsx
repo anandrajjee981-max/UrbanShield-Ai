@@ -30,13 +30,28 @@ export default function GlobalAISearch() {
 
   // Role-aware suggestions only — reads the EXISTING auth state,
   // creates no new auth logic. Guests see the CITIZEN-style defaults.
-  const role = useAppSelector((s) => s.auth.user?.role) as AiSearchRole | undefined;
+  const { isAuthenticated, user } = useAppSelector((s) => s.auth);
+  const role = user?.role as AiSearchRole | undefined;
   const suggestions = ROLE_SUGGESTIONS[role ?? 'GUEST'];
 
   const sendMessage = useCallback(
     (raw: string, appendUser: boolean) => {
       const text = raw.trim();
       if (text === '' || loading) return;
+
+      if (!isAuthenticated) {
+        setMessages((prev) => [
+          ...prev,
+          ...(appendUser ? [{ id: newId(), role: 'user' as const, text }] : []),
+          {
+            id: newId(),
+            role: 'assistant',
+            text: 'Please sign in to use the UrbanShield AI assistant.',
+          },
+        ]);
+        setDraft('');
+        return;
+      }
 
       const history: AiChatHistoryTurn[] = messages
         .filter((m) => !m.isError)
@@ -72,7 +87,7 @@ export default function GlobalAISearch() {
         },
       );
     },
-    [loading, messages],
+    [isAuthenticated, loading, messages],
   );
 
   const retry = useCallback(() => {
