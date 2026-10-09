@@ -1,4 +1,4 @@
-import { ShieldCheck } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 interface Props {
   open: boolean;
@@ -6,8 +6,8 @@ interface Props {
 }
 
 /**
- * Floating entry point for the global AI search.
- * Desktop: pill with logo + label. Mobile: compact circular icon.
+ * Floating entry point for the global AI assistant — a compact box with an
+ * icon inside. Opening it expands the assistant to full width on every size.
  */
 export default function AISearchButton({ open, onToggle }: Props) {
   return (
@@ -24,13 +24,17 @@ export default function AISearchButton({ open, onToggle }: Props) {
       <button
         type="button"
         onClick={onToggle}
-        aria-label={open ? 'Close UrbanShield AI search' : 'Ask UrbanShield AI'}
+        aria-label={open ? 'Close UrbanShield AI assistant' : 'Open UrbanShield AI assistant'}
         aria-expanded={open}
-        title={open ? 'Close AI search' : 'Ask UrbanShield AI'}
-        className="flex h-12 w-12 items-center justify-center rounded-full bg-brand text-white shadow-xl shadow-brand/30 transition-all duration-150 hover:scale-105 hover:bg-brand-warm hover:shadow-brand/40 active:scale-95 md:h-auto md:w-auto md:gap-2 md:rounded-full md:px-5 md:py-3"
+        title={open ? 'Close AI assistant' : 'Ask UrbanShield AI'}
+        className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand text-white shadow-xl shadow-brand/30 transition-all duration-150 hover:scale-105 hover:bg-brand-warm hover:shadow-brand/40 active:scale-95 md:h-14 md:w-14"
       >
-        <ShieldCheck size={22} className="shrink-0" aria-hidden />
-        <span className="hidden text-sm font-bold md:inline">{open ? 'Close' : 'Ask AI'}</span>
+        <span className="flex flex-col items-center gap-0.5">
+          <Sparkles size={20} aria-hidden />
+          <span className="hidden text-[9px] font-extrabold uppercase leading-none md:inline">
+            {open ? 'Close' : 'AI'}
+          </span>
+        </span>
       </button>
     </div>
   );

@@ -116,6 +116,45 @@ const envSchema = z.object({
   BOSS_TIMEOUT_MS: z.coerce.number().int().positive().default(60000),
 
   /**
+   * Mistral API key for the dashboard AI assistant (`POST /api/ai/chat`).
+   *
+   * Optional on purpose, matching OPENROUTER_API_KEY: without it the assistant
+   * endpoint returns AI_SERVICE_UNAVAILABLE and the rest of the API keeps
+   * working. A blank value is treated the same as an absent one. The key is
+   * server side only and is never logged or returned.
+   */
+  MISTRAL_API_KEY: z.preprocess(
+    (value) =>
+      typeof value === 'string' && value.trim() === ''
+        ? undefined
+        : typeof value === 'string'
+          ? value.trim()
+          : value,
+    z.string().min(1, 'MISTRAL_API_KEY must not be blank').optional(),
+  ),
+
+  /** Model the AI assistant talks to on Mistral. */
+  MISTRAL_MODEL: z.string().trim().min(1, 'MISTRAL_MODEL must not be blank').default('open-mistral-nemo'),
+
+  /** Mistral REST base url (openai-compatible chat completions). */
+  MISTRAL_BASE_URL: z.string().url('MISTRAL_BASE_URL must be a valid URL').default('https://api.mistral.ai/v1'),
+
+  /** Hard cap in milliseconds for one assistant model call. */
+  AI_CHAT_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
+
+  /** How many assistant chat requests one account may send per minute. */
+  AI_CHAT_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(20),
+
+  /** Longest single assistant question the API accepts. */
+  AI_CHAT_MESSAGE_MAX_LENGTH: z.coerce.number().int().positive().default(1000),
+
+  /** How many prior turns of the conversation are sent back to the model. */
+  AI_CHAT_HISTORY_MAX_TURNS: z.coerce.number().int().positive().max(20).default(6),
+
+  /** How many civic records are summarised into the assistant context. */
+  AI_CHAT_CONTEXT_LIMIT: z.coerce.number().int().positive().max(100).default(20),
+
+  /**
    * Upper bound for one uploaded government identity document, enforced by multer
    * before any byte is read from the socket.
    *
