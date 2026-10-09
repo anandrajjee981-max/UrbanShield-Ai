@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1   # Ingress is in the networking group
+kind: Ingress
+metadata:
+  name: express-ingress
+spec:
+  ingressClassName: nginx         # which controller handles this rule
+  rules:
+    - host: express.local          # domain to match
+      http:
+        paths:
+          - path: /
+            pathType: Prefix         # match / and everything after
+            backend:
+              service:
+                name: urban-service
+                port:
+                  number: 80
