@@ -1,0 +1,28 @@
+apiVersion: apps/v1          # Deployment lives in apps group
+kind: Deployment
+metadata:
+  name: urban-deployment
+spec:
+  replicas: 2              # always keep 2 pods running
+  selector:
+    matchLabels:
+      app: urban          # (1) manage pods that have this label
+  template:              # blueprint for each pod
+    metadata:
+      labels:
+        app: urban        # (2) stick this label on every pod created
+        owner: anand       # extra label — deployment ignores it
+    spec:
+      containers:
+        - name: urban
+          image: urban_demo:latest
+          imagePullPolicy: IfNotPresent  # use local image if it exists
+          ports:
+            - containerPort: 3000         # port your app listens on
+          resources:
+            limits:
+              memory: "128Mi"            # max memory pod can use
+              cpu: "500m"               # max CPU (500m = 0.5 core)
+            requests:
+              memory: "64Mi"             # memory reserved for this pod
+              cpu: "250m"               # CPU reserved (required for HPA)
