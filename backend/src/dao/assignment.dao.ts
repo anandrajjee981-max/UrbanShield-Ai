@@ -231,12 +231,12 @@ export const transitionTaskStatus = async (
 ): Promise<boolean> => {
   const { rowCount } = await query(
     `UPDATE authority_tasks
-        SET status = $2,
-            work_notes = COALESCE($3, work_notes),
-            rejection_reason = CASE WHEN $2 = 'CANCELLED' THEN $4 ELSE rejection_reason END,
-            completed_at = CASE WHEN $2 = 'COMPLETED' THEN NOW() ELSE completed_at END
-      WHERE id = $1
-        AND status = ANY($5::text[])`,
+        SET status = $2::text,
+            work_notes = COALESCE($3::text, work_notes),
+            rejection_reason = CASE WHEN $2::text = 'CANCELLED' THEN $4::text ELSE rejection_reason END,
+            completed_at = CASE WHEN $2::text = 'COMPLETED' THEN NOW() ELSE completed_at END
+      WHERE id = $1::uuid
+        AND status::text = ANY($5::text[])`,
     [taskId, to, opts?.note ?? null, opts?.reason ?? null, [...from]],
   );
   return (rowCount ?? 0) > 0;
