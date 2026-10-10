@@ -181,7 +181,7 @@ const envSchema = z.object({
   FRONTEND_URL: z
     .string()
     .min(1, 'FRONTEND_URL is required (e.g. http://localhost:5173)')
-    .default('http://localhost:5173')
+    .default('http://localhost:5173,https://urban-shield-ai-iota.vercel.app')
     .transform((value) =>
       value
         .split(',')

@@ -49,13 +49,16 @@ export const AUTH_COOKIE_MAX_AGE_MS = durationToMs(env.JWT_EXPIRES_IN);
  * - `httpOnly` keeps the JWT unreadable from JavaScript, so XSS cannot steal it.
  * - `secure` is enabled in production only, otherwise browsers reject the
  *   cookie on plain `http://localhost` during development.
- * - `sameSite: 'lax'` blocks cross-site POSTs (CSRF for state changing routes)
- *   while still sending the cookie on normal top-level navigations.
+ * - `sameSite: 'none'` in production because the deployed frontend runs on a
+ *   different site than the backend (Vercel https://...vercel.app calling
+ *   Render https://...onrender.com); without it the browser would silently drop
+ *   the cookie on every cross-site request and auth would 401. SameSite=none
+ *   requires `secure`, which is already forced in production.
  */
 export const authCookieOptions: CookieOptions = {
   httpOnly: true,
   secure: isProduction,
-  sameSite: 'lax',
+  sameSite: isProduction ? 'none' : 'lax',
   path: '/',
   maxAge: AUTH_COOKIE_MAX_AGE_MS,
 };
@@ -67,6 +70,6 @@ export const authCookieOptions: CookieOptions = {
 export const clearAuthCookieOptions: CookieOptions = {
   httpOnly: true,
   secure: isProduction,
-  sameSite: 'lax',
+  sameSite: isProduction ? 'none' : 'lax',
   path: '/',
 };
