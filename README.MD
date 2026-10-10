@@ -1,819 +1,264 @@
-# 🛡️ UrbanShield AI
+# UrbanShield AI 🌍
 
-> **From citizen reports to intelligent civic resolution.**
+**AI-Assisted Civic Issue Management with Human-in-the-Loop Recovery**
 
-UrbanShield AI is an **AI-powered civic issue management platform** that connects citizens, administrators, and authorities through one structured workflow.
+UrbanShield AI connects citizens, authorities and administrators to manage environmental civic issues through AI-assisted verification, intelligent task assignment and recoverable workflows.
 
-Citizens can report real-world civic problems with **description, images, and location**. Administrators verify the reports, AI analyzes verified issues, and the system helps assign tasks to suitable authorities based on their **skills, workload, availability, and estimated effort**.
+Built for **Environmental Hacks — Bharat Builds Tour, powered by AWS.**
 
----
+## The Problem
 
-## 🚨 Problem
+Reporting an environmental issue is only the first step. Issues also need verification, prioritization, assignment and follow-up.
 
-Civic problems such as:
+AI introduces another challenge: if an AI service becomes unavailable, pending work should not be lost or permanently blocked.
 
-* Water leakage
-* Water shortage
-* Flooding
-* Drainage problems
-* Extreme heat
-* Other local infrastructure issues
+## Our Solution
 
-are often reported without a proper system for:
+UrbanShield AI provides a structured workflow for:
 
-* Verification
-* Evidence collection
-* Location tracking
-* Task estimation
-* Workforce management
-* Assignment
-* Progress tracking
-* Resolution tracking
+* Citizen issue reporting with location and photo evidence.
+* AI-assisted issue verification using Watcher.
+* Issue analysis and task preparation using Boss.
+* Skill- and jurisdiction-based authority eligibility.
+* Persistent round-robin task assignment.
+* Admin intervention when automated processing cannot continue.
+* FIFO recovery queue for retrying pending AI work.
+* Role-specific dashboards for citizens, authorities and admins.
 
-UrbanShield AI creates a structured workflow from the moment a citizen reports an issue until the issue is resolved.
+**Core idea:** AI handles routine processing. Humans handle exceptions. Pending work remains recoverable.
 
----
+## System Architecture
 
-# 💡 Our Solution
+```mermaid
+flowchart TB
+    subgraph FRONTEND["Frontend — React"]
+        C[Citizen Dashboard]
+        A[Authority Dashboard]
+        AD[Admin Dashboard]
+        CHAT[AI Assistant Widget]
+    end
 
-UrbanShield AI follows:
+    subgraph BACKEND["Backend — Node.js + Express + TypeScript"]
+        API[API Routes and Controllers]
+        AUTH[Authentication and Authorization]
+        ISSUE[Issue Service]
+        WATCHER[Watcher Service]
+        BOSS[Boss Service]
+        ELIGIBILITY[Authority Eligibility]
+        RR[Round-Robin Service]
+        ASSIGN[Assignment Service]
+        RECOVERY[Recovery Queue Service]
+        ADMIN[Admin Work Item Service]
+        CHATAPI[AI Chat API]
+    end
 
-```text
-REPORT
-   ↓
-VERIFY
-   ↓
-UNDERSTAND
-   ↓
-ESTIMATE
-   ↓
-ASSIGN
-   ↓
-WORK
-   ↓
-RESOLVE
+    subgraph AI["AI Services"]
+        W[Watcher AI]
+        B[Boss AI]
+        M[Mistral API]
+    end
+
+    subgraph DB["PostgreSQL"]
+        I[(Issues)]
+        AU[(Authority Applications and Skills)]
+        R[(Round-Robin State)]
+        T[(Authority Tasks)]
+        Q[(Recovery Queue)]
+        AW[(Admin Work Items)]
+    end
+
+    C --> AUTH
+    A --> AUTH
+    AD --> AUTH
+    CHAT --> AUTH
+    AUTH --> API
+    API --> ISSUE
+    ISSUE --> I
+    ISSUE --> WATCHER
+    WATCHER --> W
+    WATCHER --> BOSS
+    BOSS --> B
+    BOSS --> ELIGIBILITY
+    ELIGIBILITY --> AU
+    ELIGIBILITY --> RR
+    RR --> R
+    RR --> ASSIGN
+    ASSIGN --> T
+    WATCHER --> RECOVERY
+    RECOVERY --> Q
+    RECOVERY --> ADMIN
+    ADMIN --> AW
+    CHAT --> CHATAPI
+    CHATAPI --> M
 ```
 
-The platform combines **human verification, AI analysis, and workload-aware task assignment**.
+*The diagram represents the logical architecture. External AI integrations and queue storage must match the actual deployed implementation.*
 
----
+## AI Verification and Assignment Workflow
 
-# 👥 User Roles
-
-UrbanShield AI has three primary roles:
-
-### 👤 Citizen
-
-Reports civic problems and tracks their reports.
-
-### 🛡️ Administrator
-
-Reviews citizen reports, verifies genuine issues, and manages the civic workflow.
-
-### 🏛️ Authority
-
-Receives assigned tasks, works on them, updates progress, and completes the work.
-
----
-
-# 👤 Citizen Features
-
-## Authentication
-
-Citizens can create an account and securely access their dashboard.
-
-After authentication, the citizen gets access only to citizen-specific features.
-
----
-
-## 📢 Report an Issue
-
-A citizen can report a real-world civic problem.
-
-The report contains:
-
-### Issue Type
-
-```text
-Water Leakage
-Water Shortage
-Extreme Heat
-Flooding
-Drainage
-Other
+```mermaid
+flowchart TD
+    A[Citizen Submits Issue] --> B[Save Issue as REPORTED]
+    B --> C[Watcher AI]
+    C -->|Accept| D[Set VERIFIED]
+    C -->|Reject| E[Set REJECTED]
+    C -->|AI Failure| Q[Store for Recovery]
+    D --> F[Boss AI Analyses Issue]
+    F -->|AI Failure| Q
+    F --> G[Determine Required Skill and Jurisdiction]
+    G --> H[Find Eligible Authorities]
+    H -->|No Match| ADM[Admin Work Item]
+    H -->|Eligible Authorities| RR[Persistent Round Robin]
+    RR --> T[Create Authority Task]
+    T --> END[Authority Handles Task]
+    Q --> R[Admin Reviews and Resumes Retry]
+    R --> C
 ```
 
-### Problem Description
+### How the AI Workflow Works
 
-The citizen explains:
+**1. Watcher — Verification**
 
-* What happened
-* Where the problem is
-* How long it has been happening
-* Any useful additional information
+Evaluates the submitted civic issue and returns a structured acceptance or rejection decision. The issue status is updated only when the database state permits the transition.
 
-The original description is preserved.
+**2. Boss — Task Intelligence**
 
----
+Analyses verified issues and identifies the required authority skill, jurisdiction, estimated duration and complexity.
 
-## 📸 Evidence
+**3. Eligibility — Deterministic Rules**
 
-Citizens can provide photographic evidence.
+Filters verified authorities using required skills, jurisdiction and availability. AI does not directly choose an unauthorized or ineligible authority.
 
-Two ways are supported:
+**4. Round Robin — Fair Assignment**
 
-```text
-Upload from Device
-        OR
-Take Photo
+Uses persistent PostgreSQL state to distribute assignments across eligible authorities instead of relying on in-memory counters.
+
+**5. Assignment — Task Creation**
+
+Creates an authority task with protection against duplicate active assignments.
+
+## AI Recovery Queue
+
+AI service availability should not determine whether civic work survives.
+
+```mermaid
+flowchart TD
+    A[AI Processing Fails] --> B[Save Pending Work]
+    B --> C[Recovery Queue]
+    C --> D[Admin Reviews Queue]
+    D --> E{AI Available?}
+    E -->|No| F[Keep Work Pending]
+    F --> C
+    E -->|Yes| G[Resume FIFO Processing]
+    G --> H{Processing Successful?}
+    H -->|Yes| I[Continue Workflow]
+    H -->|No| J[Retain Failure State]
+    J --> C
 ```
 
-Images are securely stored using ImageKit.
+The recovery workflow is designed to provide:
 
----
+* **FIFO ordering:** Older pending items are processed first.
+* **Admin control:** Administrators can inspect pending work and resume processing.
+* **Failure visibility:** Failed items should remain identifiable and recoverable.
+* **Duplicate protection:** Retries should not create duplicate tasks or administrative work items.
+* **Workflow continuity:** Issues requiring human judgment can be handled through the Admin work-item workflow.
 
-## 📍 Location
+The queue and Admin work items serve different purposes: the queue preserves pending work for retry, while Admin work items track work that requires intervention.
 
-Citizens have two options:
+## Environmental Impact
 
-```text
-Track My Location
-        OR
-Enter Location Manually
-```
+UrbanShield AI focuses on environmental civic issues such as:
 
-### GPS
+* Water leakage and drainage.
+* Flooding and waterlogging.
+* Extreme heat and related civic risks.
+* Other locally reported environmental problems.
 
-The device provides:
+The dashboard can use actual issue records to show:
 
-```text
-Latitude
-Longitude
-```
+* Total reported issues.
+* Pending and resolved issues.
+* Three-day reporting trends.
+* Repeated reports by location.
+* Areas that may require investigation.
 
-### Manual
+Historical issue patterns are not weather forecasts. Future rainfall, temperature, AQI or flood predictions should only be shown when supported by a reliable data source.
 
-The citizen provides an address/location description.
+## Dashboard AI Assistant
 
-This allows reporting even when GPS access is unavailable or the citizen prefers manual entry.
+The bottom-right AI assistant is designed to help users understand civic issues and relevant environmental information.
 
----
+* **Citizen:** Understand issue reporting, status and relevant precautions.
+* **Authority:** Summarize authorized issue data and assigned work.
+* **Admin:** Review issue patterns and administrative workload.
 
-# 📋 My Reports
+The assistant uses the Mistral API through the backend when that integration is configured. It is separate from the Watcher/Boss automated verification and assignment pipeline.
 
-Citizens can view the issues they have submitted.
+## User Roles
 
-Each report can show:
+| Role      | Main responsibilities                                                               |
+| --------- | ----------------------------------------------------------------------------------- |
+| Citizen   | Submit issues, provide evidence and track personal reports                          |
+| Authority | Review relevant issues and manage assigned tasks                                    |
+| Admin     | Verify authority applications, monitor workflows and handle administrative handoffs |
 
-* Issue type
-* Description
-* Evidence
-* Location
-* Current status
-* Submission time
-* Latest update
+Access is controlled through the project's existing authentication and authorization implementation. **Keycloak is not used.**
 
----
+## Technology Stack
 
-# 🛡️ Administrator Workflow
+| Layer                  | Technology                                                       |
+| ---------------------- | ---------------------------------------------------------------- |
+| Frontend               | React, TypeScript                                                |
+| Backend                | Node.js, Express, TypeScript                                     |
+| Database               | PostgreSQL                                                       |
+| AI orchestration       | LangGraph                                                        |
+| Watcher and Boss       | OPENROUTER integration                                               |
+| Dashboard AI assistant | Mistral API integration                                          |
+| Validation             | Zod                                                              |
+| Image storage          | ImageKit                                                         |
+| Assignment             | PostgreSQL-backed round robin                                    |
+| Infrastructure         | AWS component to be specified according to the actual deployment |
 
-Administrators are responsible for reviewing reports before they enter the AI-powered task workflow.
+## Reliability and Security
 
-## 1. View Reports
+* AI credentials remain on the backend.
+* Role permissions are enforced by the backend.
+* Authority eligibility is checked using deterministic rules.
+* Assignment and administrative handoff operations use duplicate protection.
+* AI errors are normalized rather than exposing raw provider errors.
+* Pending work can be recovered instead of requiring citizens to recreate reports.
+* Sensitive personal information is not needed for civic issue classification.
 
-The administrator can see citizen-submitted reports.
+## AWS Integration
 
-A report contains:
+**AWS service or open-source tool:** [Add the actual service/tool used]
 
-```text
-Issue Type
-Description
-Image
-Location
-Submission Time
-Current Status
-```
+**Purpose:** [Explain its role in the deployed application]
 
----
+**Deployment or evidence:** [Add the actual deployment URL or architecture evidence]
 
-## 2. Review Evidence
+Only include integrations that are genuinely implemented and demonstrable.
 
-The administrator reads the citizen's description and checks the submitted evidence and location.
+## Team
 
-The administrator can then:
+**Anand Raj** — Backend, AI Workflow and DevOps
+GitHub: https://github.com/anandrajjee981-max
 
-```text
-VERIFY
-   OR
-REJECT
-```
+**Rishikesh Pal** — Frontend Development
+GitHub: https://github.com/rishikesh-Dev01
 
----
+## Hackathon
 
-## 3. Verify
+**Environmental Hacks — Bharat Builds Tour, powered by AWS**
+Organized by WeMakeDevs.
 
-A genuine report moves from:
+**Track:** Heat & Water
 
-```text
-REPORTED
-    ↓
-VERIFIED
-```
+## Our Goal
 
-Only verified issues enter the intelligent task-analysis workflow.
+UrbanShield AI aims to turn civic reports into actionable work by connecting citizens, authorities and administrators through AI-assisted processing and human-controlled recovery.
 
----
+**AI may fail. The workflow should not lose the work.**
 
-## 4. Reject
-
-If a report is invalid or does not contain sufficient evidence:
-
-```text
-REPORTED
-    ↓
-REJECTED
-```
-
-An optional rejection reason can be stored.
-
----
-
-# 🤖 AI Issue Analysis
-
-Once an issue is verified, AI analyzes the available information.
-
-The AI does not replace the administrator's verification decision.
-
-Instead, it converts an unstructured citizen description into useful task information.
-
-For example:
-
-```text
-Citizen Description:
-
-"Water has been leaking continuously near the
-main road for two days and the road is becoming
-difficult to use."
-```
-
-AI can derive structured information such as:
-
-```text
-Issue:
-Water Leakage
-
-Complexity:
-Medium
-
-Estimated Effort:
-2 Days
-
-Required Skill:
-Water Maintenance
-
-Priority:
-High
-```
-
-The exact analysis depends on the issue and available information.
-
----
-
-# 🧠 AI-Assisted Estimation
-
-One of the main goals of UrbanShield AI is to estimate **how much effort a verified civic issue may require**.
-
-For example:
-
-```text
-Simple repair       → ~1 day
-Moderate repair     → ~2–3 days
-Complex operation   → Longer estimated effort
-```
-
-The estimated effort becomes an input for task planning.
-
-AI provides an estimate; it does not directly control the final assignment.
-
----
-
-# 🏛️ Authority Management
-
-Authorities represent the people or teams responsible for resolving civic issues.
-
-Each authority can have information such as:
-
-```text
-Authority
-├── Skills
-├── Department
-├── Current Tasks
-├── Task Deadlines
-├── Estimated Remaining Work
-└── Availability
-```
-
-This information helps the platform understand the current workforce capacity.
-
----
-
-# ⚖️ Intelligent Task Assignment
-
-UrbanShield AI does not simply assign every new task to the first available authority.
-
-Instead, assignment considers multiple factors.
-
-```text
-New Verified Issue
-        ↓
-Required Skill
-        +
-Estimated Effort
-        +
-Authority Skill
-        +
-Current Workload
-        +
-Remaining Task Duration
-        +
-Future Availability
-        ↓
-Assignment Recommendation
-```
-
----
-
-# 📊 Workforce-Aware Assignment
-
-Consider three authorities:
-
-```text
-Authority A
-Current task ends today
-Available tomorrow
-Required skill matches
-
-
-Authority B
-Current task ends after 3 days
-Required skill matches
-
-
-Authority C
-Available today
-But required skill does not match
-```
-
-For a new two-day task, the system should consider more than just who is technically free.
-
-It evaluates:
-
-* Who has the required skill?
-* Who becomes available soon?
-* How much work are they already handling?
-* How long will their existing tasks continue?
-* Can the new task realistically fit into their workload?
-
-This creates a **capacity-aware assignment recommendation**.
-
----
-
-# 🔄 Task Queue
-
-Authorities can have multiple tasks in their work queue.
-
-Example:
-
-```text
-Authority A
-
-Current Task
-Drainage Repair
-Remaining: 1 Day
-
-        ↓
-
-Next Task
-Water Leakage
-Estimated: 2 Days
-
-        ↓
-
-Next Task
-Water Shortage
-Estimated: 1 Day
-```
-
-This allows the system to understand future availability instead of looking only at the current moment.
-
----
-
-# 👨‍💼 Human-in-the-Loop Assignment
-
-AI should support the administrator rather than silently making critical decisions.
-
-The workflow is:
-
-```text
-Verified Issue
-      ↓
-AI Analysis
-      ↓
-Task Estimation
-      ↓
-Authority Capacity Analysis
-      ↓
-Assignment Recommendation
-      ↓
-Administrator Review
-      ↓
-Final Assignment
-```
-
-The administrator remains responsible for the final assignment decision.
-
----
-
-# 🏗️ Authority Task Workflow
-
-After assignment:
-
-```text
-ASSIGNED
-   ↓
-IN_PROGRESS
-   ↓
-RESOLVED
-```
-
-The authority can:
-
-* View task details
-* Understand the issue
-* See location
-* Start the task
-* Update progress
-* Complete the work
-
----
-
-# ✅ Resolution
-
-Once the authority completes the assigned work:
-
-```text
-IN_PROGRESS
-      ↓
-RESOLVED
-```
-
-The issue lifecycle can then be tracked from its original citizen report to final resolution.
-
----
-
-# 🔄 Complete End-to-End Workflow
-
-```text
-                         CITIZEN
-                            │
-                            ▼
-                    Register / Login
-                            │
-                            ▼
-                    Citizen Dashboard
-                            │
-                            ▼
-                     Report an Issue
-                            │
-              ┌─────────────┼─────────────┐
-              ▼             ▼             ▼
-          Description     Image        Location
-                                         │
-                              ┌──────────┴──────────┐
-                              ▼                     ▼
-                         GPS Location        Manual Location
-                              │                     │
-                              └──────────┬──────────┘
-                                         ▼
-                                  Submit Report
-                                         │
-                                         ▼
-                                      REPORTED
-                                         │
-                                         ▼
-                                    ADMINISTRATOR
-                                         │
-                                         ▼
-                                  Review Report
-                                         │
-                            ┌────────────┴────────────┐
-                            ▼                         ▼
-                         VERIFY                    REJECT
-                            │                         │
-                            ▼                         ▼
-                        VERIFIED                  REJECTED
-                            │
-                            ▼
-                       AI ANALYSIS
-                            │
-                 ┌──────────┼───────────┐
-                 ▼          ▼           ▼
-              Skill     Complexity   Effort
-            Required                 Estimate
-                 │          │           │
-                 └──────────┼───────────┘
-                            ▼
-                    WORKFORCE ANALYSIS
-                            │
-                 ┌──────────┼───────────┐
-                 ▼          ▼           ▼
-              Skills    Workload    Availability
-                            │
-                            ▼
-                  ASSIGNMENT RECOMMENDATION
-                            │
-                            ▼
-                       ADMIN REVIEW
-                            │
-                            ▼
-                         ASSIGNED
-                            │
-                            ▼
-                        AUTHORITY
-                            │
-                            ▼
-                       IN_PROGRESS
-                            │
-                            ▼
-                         RESOLVED
-```
-
----
-
-# 🔐 Role-Based Access
-
-Every user receives access according to their role.
-
-```text
-                  USER
-                   │
-          ┌────────┼────────┐
-          ▼        ▼        ▼
-       CITIZEN  AUTHORITY  ADMIN
-          │        │        │
-          ▼        ▼        ▼
-       Citizen   Authority  Admin
-       Dashboard Dashboard Dashboard
-```
-
-### Citizen
-
-Can:
-
-* Report issues
-* View own reports
-* Track report status
-
-### Authority
-
-Can:
-
-* View assigned tasks
-* Work on assigned issues
-* Update task progress
-* Complete tasks
-
-### Administrator
-
-Can:
-
-* Review reports
-* Verify reports
-* Reject reports
-* Manage the issue workflow
-* Review AI recommendations
-* Approve task assignments
-
-Users cannot access another role's protected dashboard or actions.
-
----
-
-# 🧩 System Architecture
-
-```text
-                    ┌───────────────┐
-                    │    Citizen    │
-                    └───────┬───────┘
-                            │
-                    ┌───────▼───────┐
-                    │   Frontend    │
-                    │    React      │
-                    └───────┬───────┘
-                            │
-                            ▼
-                    ┌───────────────┐
-                    │    Backend    │
-                    │ Node + Express│
-                    └───────┬───────┘
-                            │
-             ┌──────────────┼──────────────┐
-             ▼              ▼              ▼
-         PostgreSQL      ImageKit          AI
-           Neon                         Analysis
-             │
-             ▼
-       Issue + User Data
-```
-
----
-
-# 🛠️ Technology Stack
-
-## Frontend
-
-* React.js
-* TypeScript
-* Responsive Web UI
-
-## Backend
-
-* Node.js
-* Express.js
-* TypeScript
-* REST architecture
-
-## Database
-
-* PostgreSQL
-* Neon
-
-## Authentication
-
-* Keycloak
-* Role-Based Access Control
-
-## Image Storage
-
-* ImageKit
-
-## AI
-
-* AI-powered issue analysis
-* Effort estimation
-* Skill identification
-* Assignment recommendation
-
-## Deployment
-
-* Vercel for frontend
-* Cloud-based backend deployment
-* Neon for managed PostgreSQL
-* ImageKit for image storage
-
----
-
-# 🔒 Security
-
-UrbanShield AI is designed around role-based access and protected user data.
-
-Important principles include:
-
-* Role-based authorization
-* Server-side permission checks
-* Secure authentication
-* Protected administrative actions
-* Validated issue data
-* Secure image handling
-* No sensitive credentials exposed to clients
-* Citizen identity is taken from the authenticated session
-* Users cannot arbitrarily change issue status
-
----
-
-# 📈 Issue Lifecycle
-
-The complete issue lifecycle is:
-
-```text
-REPORTED
-   │
-   ├──────────────► REJECTED
-   │
-   ▼
-VERIFIED
-   │
-   ▼
-ASSIGNED
-   │
-   ▼
-IN_PROGRESS
-   │
-   ▼
-RESOLVED
-```
-
-Each stage represents a different part of the civic resolution process.
-
----
-
-# 🎯 What Makes UrbanShield AI Different
-
-UrbanShield AI is not just a complaint submission platform.
-
-It connects the complete workflow:
-
-```text
-Citizen Reporting
-       +
-Evidence
-       +
-Location
-       +
-Human Verification
-       +
-AI Understanding
-       +
-Effort Estimation
-       +
-Workforce Capacity
-       +
-Smart Assignment
-       +
-Task Tracking
-       +
-Resolution
-```
-
-The goal is to move from:
-
-> **"A citizen reported a problem."**
-
-to:
-
-> **"The problem was verified, understood, assigned to an appropriate authority, and tracked until resolution."**
-
----
-
-# 🌆 Vision
-
-UrbanShield AI aims to create a more structured and intelligent way to manage civic problems.
-
-Instead of treating every complaint as an isolated report, the platform builds a complete operational workflow around it.
-
-```text
-See the Problem
-       ↓
-Understand the Problem
-       ↓
-Find the Right Resource
-       ↓
-Manage the Work
-       ↓
-Resolve the Problem
-```
-
----
-
-# 🚀 Future Scope
-
-UrbanShield AI can be extended with:
-
-* AI image-based issue detection
-* Duplicate report detection
-* Civic issue heatmaps
-* Real-time notifications
-* SLA and deadline monitoring
-* Automatic escalation
-* Authority performance analytics
-* Public transparency dashboard
-* Historical civic data analysis
-* Predictive urban insights
-* Multilingual reporting
-* Mobile application
-* Citizen feedback after resolution
-
----
-
-# 👨‍💻 Team
-
-## Rishikesh Pal
-
-**Frontend Developer**
-
-GitHub:
-https://github.com/rishikesh-Dev01
-
-## Anand Raj
-
-**Backend • AI • DevOps**
-
-GitHub:
-https://github.com/anandrajjee981-max
-
----
-
-# ❤️ Built for Smarter Cities
-
-**UrbanShield AI**
-
-*Report. Verify. Understand. Assign. Resolve.*
+#BharatBuilds #EnvironmentalHacks #AWS #WeMakeDevs #ClimateTech #CivicTech
