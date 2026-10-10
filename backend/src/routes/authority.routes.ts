@@ -7,6 +7,7 @@ import { requireVerifiedAuthority } from '../middleware/authority.middleware.js'
 import { uploadAuthorityDocument } from '../middleware/authority-upload.middleware.js';
 import { validateBody } from '../middleware/validate.middleware.js';
 import { submitAuthorityApplicationSchema } from '../validation/authority.schema.js';
+import { taskCommentSchema, updateTaskStatusSchema } from '../validation/task.schema.js';
 import { TooManyRequestsError } from '../utils/api-error.js';
 import type { UserRole } from '../types/auth.types.js';
 
@@ -111,8 +112,7 @@ authorityRouter.get(
  *
  * Behind `requireVerifiedAuthority`: a PENDING or REJECTED candidate gets a 403
  * with AUTHORITY_NOT_VERIFIED, so unverified candidates can never see task data.
- * Read-only - no transition endpoints here; task status changes are the
- * authority module's future work, and admin work items are never returned.
+ * Supports ?status=&priority=&search=&page=&limit=. Unknown filters are ignored.
  */
 authorityRouter.get(
   '/tasks',
@@ -120,6 +120,43 @@ authorityRouter.get(
   requireRole(...CANDIDATE_ONLY),
   requireVerifiedAuthority(),
   authorityController.listMyTasks,
+);
+
+/** GET /api/authority/tasks/:taskId - details (owner only). */
+authorityRouter.get(
+  '/tasks/:taskId',
+  authenticate,
+  requireRole(...CANDIDATE_ONLY),
+  requireVerifiedAuthority(),
+  authorityController.getMyTask,
+);
+
+/** PATCH /api/authority/tasks/:taskId/status - start / complete / reject. */
+authorityRouter.patch(
+  '/tasks/:taskId/status',
+  authenticate,
+  requireRole(...CANDIDATE_ONLY),
+  requireVerifiedAuthority(),
+  validateBody(updateTaskStatusSchema),
+  authorityController.updateMyTaskStatus,
+);
+
+/** GET|POST /api/authority/tasks/:taskId/comments - notes on the task. */
+authorityRouter.get(
+  '/tasks/:taskId/comments',
+  authenticate,
+  requireRole(...CANDIDATE_ONLY),
+  requireVerifiedAuthority(),
+  authorityController.listMyTaskComments,
+);
+
+authorityRouter.post(
+  '/tasks/:taskId/comments',
+  authenticate,
+  requireRole(...CANDIDATE_ONLY),
+  requireVerifiedAuthority(),
+  validateBody(taskCommentSchema),
+  authorityController.addMyTaskComment,
 );
 
 export default authorityRouter;
