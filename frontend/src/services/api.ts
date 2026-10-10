@@ -318,3 +318,99 @@ export async function fetchMyTasksRequest(params?: {
   });
   return res.data.data.issues;
 }
+
+// ---------------------------------------------------------------------------
+// Authority "My Tasks" — GET/PATCH /api/authority/tasks (verified AUTHORITY)
+// ---------------------------------------------------------------------------
+
+export type AssignedTaskStatus = 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type AssignedTaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+export interface AssignedTask {
+  id: string;
+  issueId: string;
+  title: string | null;
+  issueType: string;
+  description: string;
+  imageUrl: string | null;
+  location: { type: 'GPS'; latitude: number; longitude: number } | { type: 'MANUAL'; address: string };
+  requiredSkill: string;
+  requiredJurisdiction: string | null;
+  estimatedDurationMinutes: number;
+  complexity: string;
+  status: AssignedTaskStatus;
+  priority: AssignedTaskPriority;
+  dueDate: string | null;
+  assignedBy: string | null;
+  completedAt: string | null;
+  rejectionReason: string | null;
+  workNotes: string | null;
+  isOverdue: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskCounts {
+  pending: number;
+  inProgress: number;
+  overdue: number;
+  completed: number;
+  total: number;
+}
+
+export interface TaskComment {
+  id: string;
+  body: string;
+  authorRole: string;
+  authorName: string | null;
+  createdAt: string;
+}
+
+export async function fetchAssignedTasksRequest(params?: {
+  status?: AssignedTaskStatus;
+  priority?: AssignedTaskPriority;
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{ tasks: AssignedTask[]; counts: TaskCounts }> {
+  const res = await api.get<ApiSuccess<{ tasks: AssignedTask[]; counts: TaskCounts }>>(
+    '/authority/tasks',
+    { params },
+  );
+  return res.data.data;
+}
+
+export async function fetchAssignedTaskRequest(
+  taskId: string,
+): Promise<{ task: AssignedTask; comments: TaskComment[] }> {
+  const res = await api.get<ApiSuccess<{ task: AssignedTask; comments: TaskComment[] }>>(
+    `/authority/tasks/${taskId}`,
+  );
+  return res.data.data;
+}
+
+export async function updateAssignedTaskStatusRequest(
+  taskId: string,
+  input: { status: 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'; note?: string; reason?: string },
+): Promise<AssignedTask> {
+  const res = await api.patch<ApiSuccess<{ task: AssignedTask }>>(
+    `/authority/tasks/${taskId}/status`,
+    input,
+  );
+  return res.data.data.task;
+}
+
+export async function fetchTaskCommentsRequest(taskId: string): Promise<TaskComment[]> {
+  const res = await api.get<ApiSuccess<{ comments: TaskComment[] }>>(
+    `/authority/tasks/${taskId}/comments`,
+  );
+  return res.data.data.comments;
+}
+
+export async function postTaskCommentRequest(taskId: string, body: string): Promise<TaskComment> {
+  const res = await api.post<ApiSuccess<{ comment: TaskComment }>>(
+    `/authority/tasks/${taskId}/comments`,
+    { body },
+  );
+  return res.data.data.comment;
+}

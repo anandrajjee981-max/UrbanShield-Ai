@@ -1,8 +1,9 @@
 import type { Request, Response } from 'express';
 import * as adminTaskService from '../service/admin-task.service.js';
 import * as aiQueueService from '../service/ai-queue.service.js';
+import * as assignmentService from '../service/assignment.service.js';
 import { resendRetryBucket } from '../ai/services/workflow.service.js';
-import { NotFoundError, UnauthorizedError } from '../utils/api-error.js';
+import { BadRequestError, NotFoundError, UnauthorizedError } from '../utils/api-error.js';
 import { sendSuccess } from '../utils/api-response.js';
 import { asyncHandler } from '../utils/async-handler.js';
 
@@ -78,3 +79,55 @@ const resendQueueHandler = async (_req: Request, res: Response): Promise<void> =
 
 export const listQueue = asyncHandler(listQueueHandler);
 export const resendQueue = asyncHandler(resendQueueHandler);
+
+/** GET /api/admin/tasks/assignments - every authority assignment (monitoring). */
+const listAssignmentsHandler = async (req: Request, res: Response): Promise<void> => {
+  requireAdmin(req);
+  const tasks = await assignmentService.listAllTasksForAdmin();
+  sendSuccess(res, 200, 'Assignments retrieved', { tasks });
+};
+
+/**
+ * POST /api/admin/tasks/assign - manually assign a VERIFIED issue to a
+ * verified authority. Body: { issueId, authorityApplicationId? |
+ * authorityUserId?, title?, priority?, dueDate? }.
+ */
+const assignTaskHandler = async (req: Request, res: Response): Promise<void> => {
+  const adminId = requireAdmin(req);
+  const body = (req.body ?? {}) as {
+    issueId?: string;
+    authorityApplicationId?: string;
+    authorityUserId?: string;
+    title?: string;
+    priority?: string;
+    dueDate?: string;
+  };
+  if (!body.issueId) throw new BadRequestError('issueId is required', 'VALIDATION_ERROR');
+  const result = await assignmentService.adminAssignTask({
+    adminId,
+    issueId: body.issueId,
+    authorityApplicationId: body.authorityApplicationId,
+    authorityUserId: body.authorityUserId,
+    title: body.title,
+    priority: body.priority,
+    dueDate: body.dueDate,
+  });
+  if (!result.ok) {
+    throw new BadRequestError(
+      result.error === 'ALREADY_ASSIGNED'
+        ? 'This issue already has an active assignment'
+        : result.error === 'ISSUE_NOT_VERIFIED'
+          ? 'Only VERIFIED issues can be assigned'
+          : result.error === 'AUTHORITY_NOT_FOUND'
+            ? 'Authority not found (must be a verified authority)'
+            : 'Issue not found',
+      result.error ?? 'ASSIGN_FAILED',
+    );
+  }
+  const tasks = await assignmentService.listAllTasksForAdmin();
+  const created = tasks.find((t) => t.id === result.taskId) ?? null;
+  sendSuccess(res, 201, 'Task assigned', { task: created, taskId: result.taskId });
+};
+
+export const listAssignments = asyncHandler(listAssignmentsHandler);
+export const assignTask = asyncHandler(assignTaskHandler);

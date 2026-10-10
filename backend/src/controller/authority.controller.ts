@@ -164,9 +164,77 @@ const listMyTasksHandler = async (req: Request, res: Response): Promise<void> =>
   const userId = requireCandidate(req);
 
   const status = typeof req.query.status === 'string' ? req.query.status : undefined;
-  const tasks = await assignmentService.listMyTasks(userId, status);
+  const priority = typeof req.query.priority === 'string' ? req.query.priority : undefined;
+  const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+  const page = typeof req.query.page === 'string' ? Number(req.query.page) : undefined;
+  const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : undefined;
+  const tasks = await assignmentService.listMyTasks(userId, status, {
+    priority,
+    search,
+    page: Number.isFinite(page) ? page : undefined,
+    limit: Number.isFinite(limit) ? limit : undefined,
+  });
+  const counts = await assignmentService.getMyTaskCounts(userId);
 
-  sendSuccess(res, 200, 'Tasks retrieved', { tasks });
+  sendSuccess(res, 200, 'Tasks retrieved', { tasks, counts });
 };
 
 export const listMyTasks = asyncHandler(listMyTasksHandler);
+
+/**
+ * GET /api/authority/tasks/:taskId - details, only when owned by the caller.
+ */
+const getMyTaskHandler = async (req: Request, res: Response): Promise<void> => {
+  const userId = requireCandidate(req);
+  const task = await assignmentService.getMyTask(userId, req.params.taskId as string);
+  if (!task) {
+    throw new ForbiddenError('Task not found');
+  }
+  const comments = await assignmentService.listMyTaskComments(userId, req.params.taskId as string);
+  sendSuccess(res, 200, 'Task retrieved', { task, comments: comments.comments ?? [] });
+};
+
+/**
+ * PATCH /api/authority/tasks/:taskId/status - ASSIGNED -> IN_PROGRESS ->
+ * COMPLETED, or CANCELLED (reject) with a reason.
+ */
+const updateMyTaskStatusHandler = async (req: Request, res: Response): Promise<void> => {
+  const userId = requireCandidate(req);
+  const body = (req.body ?? {}) as { status?: string; note?: string; reason?: string };
+  const result = await assignmentService.updateMyTaskStatus(
+    userId,
+    req.params.taskId as string,
+    String(body.status ?? '').toUpperCase(),
+    { note: body.note, reason: body.reason },
+  );
+  if (!result.ok) {
+    if (result.error === 'NOT_FOUND') throw new ForbiddenError('Task not found');
+    if (result.error === 'FORBIDDEN') throw new ForbiddenError('You cannot update this task');
+    throw new ForbiddenError('This status change is not allowed from the current state');
+  }
+  sendSuccess(res, 200, 'Task status updated', { task: result.task });
+};
+
+const listMyTaskCommentsHandler = async (req: Request, res: Response): Promise<void> => {
+  const userId = requireCandidate(req);
+  const result = await assignmentService.listMyTaskComments(userId, req.params.taskId as string);
+  if (!result.ok) throw new ForbiddenError('Task not found');
+  sendSuccess(res, 200, 'Comments retrieved', { comments: result.comments ?? [] });
+};
+
+const addMyTaskCommentHandler = async (req: Request, res: Response): Promise<void> => {
+  const userId = requireCandidate(req);
+  const body = (req.body ?? {}) as { body?: string };
+  const result = await assignmentService.addMyTaskComment(
+    userId,
+    req.params.taskId as string,
+    String(body.body ?? ''),
+  );
+  if (!result.ok) throw new ForbiddenError('Task not found');
+  sendSuccess(res, 201, 'Comment added', { comment: result.comment });
+};
+
+export const getMyTask = asyncHandler(getMyTaskHandler);
+export const updateMyTaskStatus = asyncHandler(updateMyTaskStatusHandler);
+export const listMyTaskComments = asyncHandler(listMyTaskCommentsHandler);
+export const addMyTaskComment = asyncHandler(addMyTaskCommentHandler);

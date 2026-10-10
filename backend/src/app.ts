@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.routes.js';
 import adminAuthorityRoutes from './routes/admin-authority.routes.js';
 import adminIssueRoutes from './routes/admin-issue.routes.js';
 import adminTaskRoutes from './routes/admin-task.routes.js';
+import adminUserRoutes from './routes/admin-user.routes.js';
 import aiAssistantRoutes from './routes/ai-assistant.routes.js';
 import authorityRoutes from './routes/authority.routes.js';
 import authorityIssueRoutes from './routes/authority-issue.routes.js';
@@ -81,6 +82,8 @@ app.use('/api/auth', authRoutes);
   //   /api/admin/authority-applications[...]      the admin verify/reject queue
   app.use('/api/authority', authorityRoutes);
   app.use('/api/admin/authority-applications', adminAuthorityRoutes);
+  // Governed provisioning (ADMIN only): POST /api/admin/users.
+  app.use('/api/admin/users', adminUserRoutes);
   // The admin's view of the same issues is monitoring only - GET, no transitions.
   app.use('/api/admin/issues', adminIssueRoutes);
   // Admin "My Tasks": workflow failure work items (AI failure, no eligible

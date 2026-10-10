@@ -187,10 +187,10 @@ export const submitAuthorityApplicationSchema = z
     phone: phoneNumber,
     email: contactEmail,
     address: z
-      .string({ error: 'Address is required' })
+      .string()
       .trim()
-      .min(1, 'Address is required')
-      .max(AUTHORITY_ADDRESS_MAX_LENGTH, `Address must be at most ${AUTHORITY_ADDRESS_MAX_LENGTH} characters`),
+      .max(AUTHORITY_ADDRESS_MAX_LENGTH, `Address must be at most ${AUTHORITY_ADDRESS_MAX_LENGTH} characters`)
+      .default(''),
 
     // --------------------------------------------- government identity
     governmentIdType: z.enum(GOVERNMENT_ID_TYPES, {

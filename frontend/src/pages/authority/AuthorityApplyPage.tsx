@@ -84,27 +84,17 @@ export default function AuthorityApplyPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
-    if (!fullName.trim() || !dateOfBirth || !phone.trim() || !email.trim() || !address.trim()
-      || !governmentIdType || !governmentIdNumber.trim() || !department || !designation
-      || !jurisdictionType || !jurisdictionName.trim()) {
-      setFormError('Please fill in every required field.');
-      return;
-    }
-    if (skills.length === 0) {
-      setFormError('Select at least one skill.');
-      return;
-    }
-    if (!document) {
-      setFormError('A government identity document is required.');
-      return;
-    }
-    if (!ACCEPTED_DOCS.includes(document.type)) {
-      setFormError('Document must be JPG, PNG, WebP or PDF.');
-      return;
-    }
-    if (document.size > MAX_DOC_BYTES) {
-      setFormError('Document must be at most 8 MB.');
-      return;
+    // NOTE: required-field checks removed for now — every field is optional
+    // on the client. Backend may still reject empty values.
+    if (document) {
+      if (!ACCEPTED_DOCS.includes(document.type)) {
+        setFormError('Document must be JPG, PNG, WebP or PDF.');
+        return;
+      }
+      if (document.size > MAX_DOC_BYTES) {
+        setFormError('Document must be at most 8 MB.');
+        return;
+      }
     }
     const input: SubmitApplicationInput = {
       fullName, dateOfBirth, phone, email, address,
@@ -254,7 +244,7 @@ export default function AuthorityApplyPage() {
               <label className={labelCls}>Date of birth<input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} className={`${inputCls} mt-1.5`} /></label>
               <label className={labelCls}>Phone<input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="10–15 digits" maxLength={20} inputMode="tel" className={`${inputCls} mt-1.5`} /></label>
               <label className={labelCls}>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@department.gov" maxLength={320} className={`${inputCls} mt-1.5`} /></label>
-              <label className={`${labelCls} sm:col-span-2`}>Address<textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} maxLength={500} placeholder="Residential address" className={`${inputCls} mt-1.5 resize-y`} /></label>
+              <label className={`${labelCls} sm:col-span-2`}>Address (optional)<textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} maxLength={500} placeholder="Residential address" className={`${inputCls} mt-1.5 resize-y`} /></label>
             </div>
           </section>
 

@@ -1,13 +1,16 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import {
+  adminAssignTaskRequest,
   adminCreateUserRequest,
   fetchAdminIssueByIdRequest,
   fetchAdminIssuesRequest,
   fetchAuthorityApplicationByIdRequest,
   fetchAuthorityApplicationsRequest,
   fetchAuthorityAuditTrailRequest,
+  fetchRetryQueueRequest,
   getApiErrorMessage,
   rejectAuthorityApplicationRequest,
+  resendRetryQueueRequest,
   verifyAuthorityApplicationRequest,
   type AdminMonitoredIssue,
   type AdminStats,
@@ -17,6 +20,9 @@ import {
   type AuthorityVerificationStatus,
   type CreatedUser,
   type ProvisionableRole,
+  type RetryQueueDrainResult,
+  type RetryQueueEntry,
+  type RetryQueueStatus,
 } from '../../services/admin.service';
 
 /**
@@ -51,6 +57,11 @@ interface AdminState {
   createUserLoading: boolean;
   createUserError: string | null;
   lastCreatedUser: CreatedUser | null;
+  retryQueue: RetryQueueEntry[];
+  retryQueueFetch: AsyncSection;
+  resendLoading: boolean;
+  resendError: string | null;
+  lastResend: (RetryQueueDrainResult & { at: string }) | null;
 }
 
 const idle = (): AsyncSection => ({ loading: false, error: null });
@@ -74,6 +85,11 @@ const initialState: AdminState = {
   createUserLoading: false,
   createUserError: null,
   lastCreatedUser: null,
+  retryQueue: [],
+  retryQueueFetch: idle(),
+  resendLoading: false,
+  resendError: null,
+  lastResend: null,
 };
 
 const toStats = (
@@ -86,7 +102,9 @@ const toStats = (
   totalApplications: applications.length,
   pendingApplications: applications.filter((a) => a.verificationStatus === 'PENDING').length,
   verifiedAuthorities: applications.filter((a) => a.verificationStatus === 'VERIFIED').length,
-  resolvedIssues: issues.filter((i) => i.status === 'RESOLVED').length,
+  // No ASSIGNED/IN_PROGRESS/RESOLVED API exists yet: VERIFIED is the terminal
+  // review outcome, so it is what "review completed" means here.
+  resolvedIssues: issues.filter((i) => i.status === 'VERIFIED').length,
   rejectedIssues: issues.filter((i) => i.status === 'REJECTED').length,
 });
 
@@ -209,6 +227,48 @@ export const adminCreateUser = createAsyncThunk<
     });
   } catch (err) {
     return rejectWithValue(getApiErrorMessage(err, 'Could not create the account.'));
+  }
+});
+
+export const adminAssignTask = createAsyncThunk<
+  { taskId: string },
+  {
+    issueId: string;
+    authorityApplicationId: string;
+    title?: string;
+    priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    dueDate?: string;
+  },
+  { rejectValue: string }
+>('admin/assignTask', async (input, { rejectWithValue }) => {
+  try {
+    return await adminAssignTaskRequest(input);
+  } catch (err) {
+    return rejectWithValue(getApiErrorMessage(err, 'Could not assign the task.'));
+  }
+});
+
+export const fetchRetryQueue = createAsyncThunk<
+  RetryQueueEntry[],
+  { status?: RetryQueueStatus } | undefined,
+  { rejectValue: string }
+>('admin/fetchRetryQueue', async (params, { rejectWithValue }) => {
+  try {
+    return await fetchRetryQueueRequest(params?.status);
+  } catch (err) {
+    return rejectWithValue(getApiErrorMessage(err, 'Unable to load retry queue.'));
+  }
+});
+
+export const resendRetryQueue = createAsyncThunk<
+  RetryQueueDrainResult,
+  void,
+  { rejectValue: string }
+>('admin/resendRetryQueue', async (_, { rejectWithValue }) => {
+  try {
+    return await resendRetryQueueRequest();
+  } catch (err) {
+    return rejectWithValue(getApiErrorMessage(err, 'Resend failed. Please try again.'));
   }
 });
 
@@ -342,6 +402,20 @@ const slice = createSlice({
       s.actionLoading = false;
       s.actionError = a.payload ?? 'Rejection failed.';
     });
+    // Manual task assignment
+    b.addCase(adminAssignTask.pending, (s) => {
+      s.actionLoading = true;
+      s.actionError = null;
+      s.lastAction = null;
+    });
+    b.addCase(adminAssignTask.fulfilled, (s) => {
+      s.actionLoading = false;
+      s.lastAction = 'assigned';
+    });
+    b.addCase(adminAssignTask.rejected, (s, a) => {
+      s.actionLoading = false;
+      s.actionError = a.payload ?? 'Assignment failed.';
+    });
     // Audit
     b.addCase(fetchAuthorityAuditTrail.pending, (s) => {
       s.auditFetch = { loading: true, error: null };
@@ -367,6 +441,29 @@ const slice = createSlice({
     b.addCase(adminCreateUser.rejected, (s, a) => {
       s.createUserLoading = false;
       s.createUserError = a.payload ?? 'Could not create the account.';
+    });
+    // AI retry bucket
+    b.addCase(fetchRetryQueue.pending, (s) => {
+      s.retryQueueFetch = { loading: true, error: null };
+    });
+    b.addCase(fetchRetryQueue.fulfilled, (s, a) => {
+      s.retryQueueFetch = idle();
+      s.retryQueue = a.payload;
+    });
+    b.addCase(fetchRetryQueue.rejected, (s, a) => {
+      s.retryQueueFetch = { loading: false, error: a.payload ?? 'Unable to load retry queue.' };
+    });
+    b.addCase(resendRetryQueue.pending, (s) => {
+      s.resendLoading = true;
+      s.resendError = null;
+    });
+    b.addCase(resendRetryQueue.fulfilled, (s, a) => {
+      s.resendLoading = false;
+      s.lastResend = { ...a.payload, at: new Date().toISOString() };
+    });
+    b.addCase(resendRetryQueue.rejected, (s, a) => {
+      s.resendLoading = false;
+      s.resendError = a.payload ?? 'Resend failed.';
     });
   },
 });

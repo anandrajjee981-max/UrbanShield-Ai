@@ -11,16 +11,18 @@ const badgeStyles: Record<string, string> = {
   IN_PROGRESS: 'bg-civic-blue/10 text-civic-blue border-civic-blue/30',
   VERIFIED: 'bg-civic-green/10 text-civic-green border-civic-green/30',
   RESOLVED: 'bg-civic-green/10 text-civic-green border-civic-green/30',
-  REJECTED: 'bg-brand/10 text-brand border-brand/30',
+  // WCAG AA: pure brand-orange on tint fails 4.5:1 in light mode, so rejected
+  // states use a darker red there while keeping the orange accent in dark mode.
+  REJECTED: 'bg-brand/10 text-[#b3261e] dark:text-brand border-brand/30',
   // Severity / misc
-  CRITICAL: 'bg-brand/10 text-brand border-brand/30',
-  HIGH: 'bg-brand/10 text-brand border-brand/30',
+  CRITICAL: 'bg-brand/10 text-[#b3261e] dark:text-brand border-brand/30',
+  HIGH: 'bg-brand/10 text-[#b3261e] dark:text-brand border-brand/30',
   MEDIUM: 'bg-civic-amber/15 text-civic-amber-dark border-civic-amber/40',
   LOW: 'bg-canvas text-soft border-line',
   SUBMIT: 'bg-canvas text-soft border-line',
   RESUBMIT: 'bg-civic-blue/10 text-civic-blue border-civic-blue/30',
   VERIFY: 'bg-civic-green/10 text-civic-green border-civic-green/30',
-  REJECT: 'bg-brand/10 text-brand border-brand/30',
+  REJECT: 'bg-brand/10 text-[#b3261e] dark:text-brand border-brand/30',
 };
 
 export function StatusBadge({ value }: { value: string }) {
@@ -76,7 +78,7 @@ export function ErrorState({
         <AlertTriangle size={20} />
       </div>
       <p className="font-bold text-ink text-sm">{title}</p>
-      <p className="text-xs text-mute mt-1">Check your connection and permissions, then retry.</p>
+      <p className="text-xs text-soft mt-1">Check your connection and permissions, then retry.</p>
       {onRetry && (
         <button
           onClick={onRetry}
@@ -96,7 +98,7 @@ export function ForbiddenState() {
         <AlertTriangle size={20} />
       </div>
       <p className="font-bold text-ink">You do not have permission to access this area.</p>
-      <p className="text-xs text-mute mt-1">This section is restricted to administrators.</p>
+      <p className="text-xs text-soft mt-1">This section is restricted to administrators.</p>
     </div>
   );
 }
@@ -108,7 +110,7 @@ export function EmptyState({ title, hint }: { title: string; hint?: string }) {
         <Inbox size={20} />
       </div>
       <p className="font-bold text-soft text-sm">{title}</p>
-      {hint && <p className="text-xs text-mute mt-1">{hint}</p>}
+      {hint && <p className="text-xs text-soft mt-1">{hint}</p>}
     </div>
   );
 }
@@ -126,7 +128,7 @@ export function PageHeader({
     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
       <div>
         <h1 className="text-xl sm:text-2xl font-extrabold text-ink tracking-tight">{title}</h1>
-        <p className="text-xs sm:text-sm text-mute mt-0.5">{subtitle}</p>
+        <p className="text-xs sm:text-sm text-soft mt-0.5">{subtitle}</p>
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>

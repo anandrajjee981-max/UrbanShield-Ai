@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import * as adminTaskController from '../controller/admin-task.controller.js';
 import { authenticate, requireRole } from '../middleware/auth.middleware.js';
+import { validateBody } from '../middleware/validate.middleware.js';
+import { adminAssignTaskSchema } from '../validation/task.schema.js';
 import type { UserRole } from '../types/auth.types.js';
 
 /**
@@ -26,6 +28,23 @@ const adminTaskRouter = Router();
 const ADMIN_ONLY: UserRole[] = ['ADMIN'];
 
 adminTaskRouter.get('/', authenticate, requireRole(...ADMIN_ONLY), adminTaskController.listTasks);
+
+/** Authority assignments board (admin monitoring of authority_tasks). */
+adminTaskRouter.get(
+  '/assignments',
+  authenticate,
+  requireRole(...ADMIN_ONLY),
+  adminTaskController.listAssignments,
+);
+
+/** Manual assignment of a VERIFIED issue to a verified authority. */
+adminTaskRouter.post(
+  '/assign',
+  authenticate,
+  requireRole(...ADMIN_ONLY),
+  validateBody(adminAssignTaskSchema),
+  adminTaskController.assignTask,
+);
 
 /** AI retry bucket: list what is waiting to be resent (default: PENDING). */
 adminTaskRouter.get(

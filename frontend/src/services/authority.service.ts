@@ -84,8 +84,8 @@ export interface SubmitApplicationInput {
   jurisdictionType: string;
   jurisdictionName: string;
   availability?: string;
-  /** Identity proof (jpg/png/webp/pdf ≤8MB). Always required, incl. resubmit. */
-  document: File;
+  /** Identity proof (jpg/png/webp/pdf ≤8MB). Optional on client for now. */
+  document: File | null;
 }
 
 export { getApiErrorMessage };
@@ -121,7 +121,7 @@ export async function submitApplicationRequest(
   form.append('jurisdictionType', input.jurisdictionType);
   form.append('jurisdictionName', input.jurisdictionName.trim());
   if (input.availability) form.append('availability', input.availability);
-  form.append('document', input.document);
+  if (input.document) form.append('document', input.document);
   const res = await api.post<ApiSuccess<{ application: MyAuthorityApplication }>>(
     '/authority/application',
     form,

@@ -278,7 +278,6 @@ const validFields = (overrides: Record<string, string> = {}): Record<string, str
   dateOfBirth: '1990-04-17',
   phone: '9876543210',
   email: 'ramesh.kumar@example.com',
-  address: 'Sector 4, Doranda, Ranchi, Jharkhand 834002',
   governmentIdType: 'AADHAAR',
   governmentIdNumber: GOV_ID_NUMBER,
   department: 'WATER_MANAGEMENT',

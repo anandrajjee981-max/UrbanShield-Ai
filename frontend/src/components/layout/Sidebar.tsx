@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, CloudSun, Map, AlertTriangle, FileText, BarChart3, Bot, Siren, ShieldCheck, Briefcase, BadgeCheck, CircleUserRound, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, CloudSun, Map, AlertTriangle, FileText, BarChart3, Bot, Siren, ShieldCheck, Briefcase, BadgeCheck, CircleUserRound, ClipboardList, LogOut, X } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { closeMobileMenu } from '../../store/slices/uiSlice';
 import { logoutThunk } from '../../store/slices/authSlice';
+import { fetchAssignedTasks } from '../../store/slices/authorityTasksSlice';
 
 interface Link { to: string; label: string; icon: typeof Map; end?: boolean; roles: readonly string[]; }
 
@@ -28,6 +29,7 @@ const SECTIONS: { label: string; links: Link[] }[] = [
   {
     label: 'Operations',
     links: [
+      { to: '/authority/tasks', label: 'My Tasks', icon: ClipboardList, roles: ['AUTHORITY'] },
       { to: '/tasks', label: 'Review Queue', icon: Briefcase, roles: ['AUTHORITY'] },
       { to: '/authority/apply', label: 'Verification', icon: BadgeCheck, roles: ['AUTHORITY'] },
       { to: '/authority/profile', label: 'My Profile', icon: CircleUserRound, roles: ['AUTHORITY'] },
@@ -54,6 +56,12 @@ export default function Sidebar() {
   const expanded = open || mobile;
   const initials = (user?.name ?? 'U').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
   const [profileOpen, setProfileOpen] = useState(false);
+  const pendingTasks = useAppSelector((s) => s.authorityTasks.counts.pending + s.authorityTasks.counts.inProgress);
+
+  // Keep the "My Tasks" badge live for verified authorities.
+  useEffect(() => {
+    if (role === 'AUTHORITY') dispatch(fetchAssignedTasks());
+  }, [dispatch, role]);
 
   // Close the profile popup on Escape.
   useEffect(() => {
@@ -108,6 +116,11 @@ export default function Sidebar() {
                           )}
                           <l.icon size={18} className={`shrink-0 transition-transform duration-200 group-hover:scale-110 ${isActive ? 'text-white' : ''}`} />
                           {(open || mobile) && <span className="truncate">{l.label}</span>}
+                          {(open || mobile) && l.to === '/authority/tasks' && pendingTasks > 0 && (
+                            <span className="ml-auto text-[10px] font-extrabold min-w-5 h-5 px-1.5 rounded-full bg-brand text-white flex items-center justify-center">
+                              {pendingTasks > 99 ? '99+' : pendingTasks}
+                            </span>
+                          )}
                         </>
                       )}
                     </NavLink>

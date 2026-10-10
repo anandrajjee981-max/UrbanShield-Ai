@@ -215,3 +215,78 @@ export async function rejectAuthorityApplicationRequest(
   );
   return res.data.data.application;
 }
+
+// ---------------------------------------------------------------------------
+// Manual task assignment (ADMIN only)
+// ---------------------------------------------------------------------------
+
+export async function adminAssignTaskRequest(input: {
+  issueId: string;
+  authorityApplicationId: string;
+  title?: string;
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  dueDate?: string;
+}): Promise<{ taskId: string }> {
+  const res = await api.post<ApiSuccess<{ taskId: string; task: unknown }>>(
+    '/admin/tasks/assign',
+    input,
+  );
+  return { taskId: res.data.data.taskId };
+}
+
+export async function adminListAssignmentsRequest(): Promise<import('./api').AssignedTask[]> {
+  const res = await api.get<ApiSuccess<{ tasks: import('./api').AssignedTask[] }>>(
+    '/admin/tasks/assignments',
+  );
+  return res.data.data.tasks;
+}
+
+// ---------------------------------------------------------------------------
+// AI retry bucket (ADMIN only) — GET /api/admin/tasks/queue, POST /queue/resend
+// ---------------------------------------------------------------------------
+
+export type RetryQueueStage = 'WATCHER' | 'BOSS' | 'ELIGIBILITY' | 'ASSIGNMENT';
+export type RetryQueueStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED';
+
+export interface RetryQueuePayload {
+  issueId: string;
+  issueType: string;
+  description: string;
+  imageUrl: string | null;
+  locationType: string;
+  latitude: number | null;
+  longitude: number | null;
+  address: string | null;
+  issueStatus: string;
+}
+
+export interface RetryQueueEntry {
+  id: string;
+  issueId: string;
+  stage: RetryQueueStage;
+  failureCode: string | null;
+  payload: RetryQueuePayload;
+  status: RetryQueueStatus;
+  attempts: number;
+  lastAttemptAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RetryQueueDrainResult {
+  claimed: number;
+  completed: number;
+  requeued: number;
+}
+
+export async function fetchRetryQueueRequest(status?: RetryQueueStatus): Promise<RetryQueueEntry[]> {
+  const res = await api.get<ApiSuccess<{ entries: RetryQueueEntry[] }>>('/admin/tasks/queue', {
+    params: status ? { status } : {},
+  });
+  return res.data.data.entries;
+}
+
+export async function resendRetryQueueRequest(): Promise<RetryQueueDrainResult> {
+  const res = await api.post<ApiSuccess<RetryQueueDrainResult>>('/admin/tasks/queue/resend', {});
+  return res.data.data;
+}

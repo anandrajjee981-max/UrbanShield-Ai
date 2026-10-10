@@ -212,6 +212,7 @@ export const assignIssueWithDecision = async (
 export interface AuthorityTaskSummary {
   id: string;
   issueId: string;
+  title: string | null;
   issueType: string;
   description: string;
   imageUrl: string | null;
@@ -223,41 +224,32 @@ export interface AuthorityTaskSummary {
   estimatedDurationMinutes: number;
   complexity: string;
   status: string;
+  priority: string;
+  dueDate: string | null;
+  assignedBy: string | null;
+  completedAt: string | null;
+  rejectionReason: string | null;
+  workNotes: string | null;
+  isOverdue: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface TaskComment {
+  id: string;
+  body: string;
+  authorRole: string;
+  authorName: string | null;
   createdAt: Date;
 }
 
-const VALID_TASK_STATUSES = new Set<string>(ASSIGNMENT_TASK_STATUSES);
-
-/**
- * Authority "My Tasks" read path.
- *
- * Read-only: an authority lists its own assignments and nothing else. The
- * authority id is resolved from the authenticated user (userId -> authority
- * application), never from a request field, and admin work items live in a
- * different table so they can never appear here. Unknown status values are
- * ignored rather than passed into SQL.
- */
-export const listMyTasks = async (
-  userId: string,
-  status?: string,
-): Promise<AuthorityTaskSummary[]> => {
-  const application = await authorityDao.findAuthorityApplicationByUserId(userId);
-  if (!application) {
-    return [];
-  }
-
-  const trimmedStatus = status?.trim().toUpperCase() ?? '';
-  const normalizedStatus =
-    trimmedStatus && VALID_TASK_STATUSES.has(trimmedStatus) ? trimmedStatus : null;
-
-  const rows = await assignmentDao.findTasksByAuthorityApplicationId(
-    application.id,
-    normalizedStatus,
-  );
-
-  return rows.map((row) => ({
+const toSummary = (row: assignmentDao.AuthorityTaskWithIssueRow): AuthorityTaskSummary => {
+  const due = row.due_date ? new Date(row.due_date) : null;
+  const terminal = row.status === 'COMPLETED' || row.status === 'CANCELLED';
+  return {
     id: row.id,
     issueId: row.issue_id,
+    title: row.title,
     issueType: row.issue_type,
     description: row.description,
     imageUrl: row.image_url,
@@ -274,6 +266,220 @@ export const listMyTasks = async (
     estimatedDurationMinutes: row.estimated_duration_minutes,
     complexity: row.complexity,
     status: row.status,
-    createdAt: row.created_at,
-  }));
+    priority: row.priority ?? 'MEDIUM',
+    dueDate: due ? due.toISOString() : null,
+    assignedBy: row.assigned_by_name,
+    completedAt: row.completed_at ? new Date(row.completed_at).toISOString() : null,
+    rejectionReason: row.rejection_reason,
+    workNotes: row.work_notes,
+    isOverdue: Boolean(due && !terminal && due.getTime() < Date.now()),
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+  };
+};
+
+const VALID_TASK_STATUSES = new Set<string>(ASSIGNMENT_TASK_STATUSES);
+
+/**
+ * Authority "My Tasks" read path.
+ *
+ * Read-only: an authority lists its own assignments and nothing else. The
+ * authority id is resolved from the authenticated user (userId -> authority
+ * application), never from a request field, and admin work items live in a
+ * different table so they can never appear here. Unknown status values are
+ * ignored rather than passed into SQL.
+ */
+export const listMyTasks = async (
+  userId: string,
+  status?: string,
+  opts?: { priority?: string; search?: string; page?: number; limit?: number },
+): Promise<AuthorityTaskSummary[]> => {
+  const application = await authorityDao.findAuthorityApplicationByUserId(userId);
+  if (!application) {
+    return [];
+  }
+
+  const trimmedStatus = status?.trim().toUpperCase() ?? '';
+  const normalizedStatus =
+    trimmedStatus && VALID_TASK_STATUSES.has(trimmedStatus) ? trimmedStatus : null;
+
+  const limit = Math.min(Math.max(opts?.limit ?? 50, 1), 100);
+  const page = Math.max(opts?.page ?? 1, 1);
+
+  const rows = await assignmentDao.findTasksByAuthorityApplicationId(
+    application.id,
+    normalizedStatus,
+    {
+      priority: opts?.priority?.trim().toUpperCase() || null,
+      search: opts?.search?.trim() || null,
+      limit,
+      offset: (page - 1) * limit,
+    },
+  );
+
+  return rows.map(toSummary);
+};
+
+/** Pending/in-progress/overdue/completed counts for the dashboard widget. */
+export const getMyTaskCounts = async (
+  userId: string,
+): Promise<{ pending: number; inProgress: number; overdue: number; completed: number; total: number }> => {
+  const application = await authorityDao.findAuthorityApplicationByUserId(userId);
+  if (!application) return { pending: 0, inProgress: 0, overdue: 0, completed: 0, total: 0 };
+  const rows = await assignmentDao.findTasksByAuthorityApplicationId(application.id, null, { limit: 500 });
+  const now = Date.now();
+  let pending = 0;
+  let inProgress = 0;
+  let overdue = 0;
+  let completed = 0;
+  for (const r of rows) {
+    if (r.status === 'ASSIGNED') pending += 1;
+    else if (r.status === 'IN_PROGRESS') inProgress += 1;
+    else if (r.status === 'COMPLETED') completed += 1;
+    if (r.due_date && r.status !== 'COMPLETED' && r.status !== 'CANCELLED' && new Date(r.due_date).getTime() < now) {
+      overdue += 1;
+    }
+  }
+  return { pending, inProgress, overdue, completed, total: rows.length };
+};
+
+/** Task details — only when the task belongs to the caller's application. */
+export const getMyTask = async (
+  userId: string,
+  taskId: string,
+): Promise<AuthorityTaskSummary | null> => {
+  const application = await authorityDao.findAuthorityApplicationByUserId(userId);
+  if (!application) return null;
+  const ownerId = await assignmentDao.findTaskAuthorityId(taskId);
+  if (ownerId !== application.id) return null;
+  const row = await assignmentDao.findTaskWithIssueById(taskId);
+  return row ? toSummary(row) : null;
+};
+
+const TRANSITIONS: Record<string, readonly string[]> = {
+  IN_PROGRESS: ['ASSIGNED'],
+  COMPLETED: ['IN_PROGRESS'],
+  CANCELLED: ['ASSIGNED', 'IN_PROGRESS'],
+};
+
+/** Authority status update: ASSIGNED -> IN_PROGRESS -> COMPLETED, or CANCELLED with reason. */
+export const updateMyTaskStatus = async (
+  userId: string,
+  taskId: string,
+  to: string,
+  opts?: { note?: string; reason?: string },
+): Promise<{ ok: boolean; error?: 'NOT_FOUND' | 'FORBIDDEN' | 'INVALID_TRANSITION'; task?: AuthorityTaskSummary }> => {
+  const application = await authorityDao.findAuthorityApplicationByUserId(userId);
+  if (!application) return { ok: false, error: 'NOT_FOUND' };
+  const ownerId = await assignmentDao.findTaskAuthorityId(taskId);
+  if (!ownerId) return { ok: false, error: 'NOT_FOUND' };
+  if (ownerId !== application.id) return { ok: false, error: 'FORBIDDEN' };
+  const allowedFrom = TRANSITIONS[to];
+  if (!allowedFrom) return { ok: false, error: 'INVALID_TRANSITION' };
+  const moved = await assignmentDao.transitionTaskStatus(taskId, allowedFrom, to, {
+    note: opts?.note?.trim() || null,
+    reason: opts?.reason?.trim() || null,
+  });
+  if (!moved) return { ok: false, error: 'INVALID_TRANSITION' };
+  const row = await assignmentDao.findTaskWithIssueById(taskId);
+  return { ok: true, task: row ? toSummary(row) : undefined };
+};
+
+export const listMyTaskComments = async (
+  userId: string,
+  taskId: string,
+): Promise<{ ok: boolean; error?: 'NOT_FOUND' | 'FORBIDDEN'; comments?: TaskComment[] }> => {
+  const application = await authorityDao.findAuthorityApplicationByUserId(userId);
+  if (!application) return { ok: false, error: 'NOT_FOUND' };
+  const ownerId = await assignmentDao.findTaskAuthorityId(taskId);
+  if (!ownerId) return { ok: false, error: 'NOT_FOUND' };
+  if (ownerId !== application.id) return { ok: false, error: 'FORBIDDEN' };
+  const rows = await assignmentDao.listTaskComments(taskId);
+  return {
+    ok: true,
+    comments: rows.map((r) => ({
+      id: r.id,
+      body: r.body,
+      authorRole: r.author_role,
+      authorName: r.author_name,
+      createdAt: new Date(r.created_at),
+    })),
+  };
+};
+
+export const addMyTaskComment = async (
+  userId: string,
+  taskId: string,
+  body: string,
+): Promise<{ ok: boolean; error?: 'NOT_FOUND' | 'FORBIDDEN'; comment?: TaskComment }> => {
+  const application = await authorityDao.findAuthorityApplicationByUserId(userId);
+  if (!application) return { ok: false, error: 'NOT_FOUND' };
+  const ownerId = await assignmentDao.findTaskAuthorityId(taskId);
+  if (!ownerId) return { ok: false, error: 'NOT_FOUND' };
+  if (ownerId !== application.id) return { ok: false, error: 'FORBIDDEN' };
+  const row = await assignmentDao.addTaskComment(taskId, userId, 'AUTHORITY', body.trim());
+  return {
+    ok: true,
+    comment: {
+      id: row.id,
+      body: row.body,
+      authorRole: row.author_role,
+      authorName: null,
+      createdAt: new Date(row.created_at),
+    },
+  };
+};
+
+/**
+ * Admin manual assignment: VERIFIED issue -> chosen verified authority.
+ * Resolves authorityUserId -> application when only the user id is known.
+ */
+export const adminAssignTask = async (params: {
+  adminId: string;
+  issueId: string;
+  authorityApplicationId?: string;
+  authorityUserId?: string;
+  title?: string;
+  priority?: string;
+  dueDate?: string;
+}): Promise<{ ok: boolean; error?: string; taskId?: string }> => {
+  const issue = await issueDao.findIssueById(params.issueId);
+  if (!issue) return { ok: false, error: 'ISSUE_NOT_FOUND' };
+  if (issue.status !== 'VERIFIED') return { ok: false, error: 'ISSUE_NOT_VERIFIED' };
+
+  let applicationId = params.authorityApplicationId ?? null;
+  if (!applicationId && params.authorityUserId) {
+    const app = await authorityDao.findAuthorityApplicationByUserId(params.authorityUserId);
+    applicationId = app?.id ?? null;
+  }
+  if (!applicationId) return { ok: false, error: 'AUTHORITY_NOT_FOUND' };
+
+  const existing = await assignmentDao.findActiveAssignmentByIssueId(params.issueId);
+  if (existing) return { ok: false, error: 'ALREADY_ASSIGNED' };
+
+  const { withTransaction } = await import('../config/db.js');
+  const createdId = await withTransaction((client) =>
+    assignmentDao.createManualAuthorityTask(client, {
+      issueId: params.issueId,
+      authorityApplicationId: applicationId as string,
+      assignmentGroup: 'MANUAL:ADMIN',
+      requiredSkill: 'EMERGENCY_RESPONSE',
+      requiredJurisdiction: null,
+      estimatedDurationMinutes: 60,
+      complexity: 'MEDIUM',
+      title: params.title?.trim() || issue.description.slice(0, 120),
+      priority: params.priority ?? 'MEDIUM',
+      dueDate: params.dueDate ? new Date(params.dueDate) : null,
+      assignedBy: params.adminId,
+    }),
+  );
+  if (!createdId) return { ok: false, error: 'ALREADY_ASSIGNED' };
+  logger.info('Issue manually assigned by admin', { issueId: params.issueId, taskId: createdId, applicationId });
+  return { ok: true, taskId: createdId };
+};
+
+/** Admin view of every assignment (monitoring only). */
+export const listAllTasksForAdmin = async (): Promise<AuthorityTaskSummary[]> => {
+  const rows = await assignmentDao.listAllTasksWithIssue(200);
+  return rows.map(toSummary);
 };

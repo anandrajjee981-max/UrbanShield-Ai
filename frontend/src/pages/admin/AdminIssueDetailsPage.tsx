@@ -1,8 +1,8 @@
-import { Suspense, lazy, useEffect } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Eye, Lock } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Eye, Lock } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { clearSelectedIssue, fetchAdminIssueById } from '../../store/slices/adminSlice';
+import { adminAssignTask, clearSelectedIssue, fetchAdminIssueById, fetchAuthorityApplications } from '../../store/slices/adminSlice';
 import {
   EmptyState,
   ErrorState,
@@ -34,10 +34,14 @@ const TIMELINE: Array<{ status: string; label: string }> = [
 export default function AdminIssueDetailsPage() {
   const { issueId } = useParams<{ issueId: string }>();
   const dispatch = useAppDispatch();
-  const { selectedIssue: issue, selectedIssueFetch } = useAppSelector((s) => s.admin);
+  const { selectedIssue: issue, selectedIssueFetch, applications, actionLoading, actionError, lastAction } = useAppSelector((s) => s.admin);
+  const [authorityId, setAuthorityId] = useState('');
+  const [priority, setPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('MEDIUM');
+  const [dueDate, setDueDate] = useState('');
 
   useEffect(() => {
     if (issueId) dispatch(fetchAdminIssueById(issueId));
+    dispatch(fetchAuthorityApplications({ status: 'VERIFIED', limit: 100 }));
     return () => {
       dispatch(clearSelectedIssue());
     };
@@ -45,6 +49,19 @@ export default function AdminIssueDetailsPage() {
 
   const reload = () => {
     if (issueId) dispatch(fetchAdminIssueById(issueId));
+  };
+
+  const assign = async () => {
+    if (!issueId || !authorityId) return;
+    const res = await dispatch(
+      adminAssignTask({
+        issueId,
+        authorityApplicationId: authorityId,
+        priority,
+        ...(dueDate ? { dueDate: new Date(dueDate).toISOString() } : {}),
+      }),
+    );
+    if (adminAssignTask.fulfilled.match(res)) reload();
   };
 
   return (
@@ -139,14 +156,76 @@ export default function AdminIssueDetailsPage() {
             <p className="text-sm text-soft mt-3 leading-relaxed">{issue.description}</p>
           </div>
 
-          {/* Assignment (informational) */}
+          {/* Assignment — manual assign to a verified authority */}
           <div className="bg-card border border-line rounded-2xl p-4 sm:p-5">
-            <h2 className="font-extrabold text-sm text-ink mb-3">Assignment</h2>
-            <div className="grid sm:grid-cols-3 gap-4">
+            <h2 className="font-extrabold text-sm text-ink mb-1">Assignment</h2>
+            <p className="text-[11px] text-mute mb-3">
+              Only VERIFIED issues can be assigned. The task appears instantly in the authority&apos;s My Tasks (/authority/tasks).
+            </p>
+            <div className="grid sm:grid-cols-3 gap-4 mb-3">
               <Field label="Assigned Authority" value={issue.assignee?.name ?? 'Unassigned'} />
               <Field label="Department" value="—" />
               <Field label="Assignment Date" value={issue.assignedAt ? new Date(issue.assignedAt).toLocaleString() : '—'} />
             </div>
+            {issue.status !== 'VERIFIED' ? (
+              <p className="text-xs text-mute bg-canvas border border-line rounded-xl p-3">
+                Assignment unlocks once the issue is VERIFIED{issue.status === 'REPORTED' ? ' (currently REPORTED — an authority must verify it first)' : ''}.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2 items-end">
+                <label className="flex-1 min-w-52 text-xs font-bold">
+                  Authority
+                  <select
+                    value={authorityId}
+                    onChange={(e) => setAuthorityId(e.target.value)}
+                    className="mt-1 w-full bg-canvas border border-line rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-brand"
+                  >
+                    <option value="">Select verified authority…</option>
+                    {applications
+                      .filter((a) => a.verificationStatus === 'VERIFIED')
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.fullName} · {a.department} ({a.email})
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <label className="text-xs font-bold">
+                  Priority
+                  <select
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value as typeof priority)}
+                    className="mt-1 bg-canvas border border-line rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-brand"
+                  >
+                    {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs font-bold">
+                  Due date
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className="mt-1 bg-canvas border border-line rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-brand"
+                  />
+                </label>
+                <button
+                  onClick={() => void assign()}
+                  disabled={!authorityId || actionLoading}
+                  className="text-xs font-extrabold px-4 py-2.5 rounded-xl bg-brand text-white hover:bg-brand-warm disabled:opacity-60"
+                >
+                  {actionLoading ? 'Assigning…' : 'Assign task'}
+                </button>
+              </div>
+            )}
+            {actionError && <p className="text-xs font-semibold text-brand mt-2">{actionError}</p>}
+            {lastAction === 'assigned' && (
+              <p className="flex items-center gap-1.5 text-xs font-bold text-civic-green mt-2">
+                <CheckCircle2 size={13} /> Task assigned — the authority now sees it under My Tasks.
+              </p>
+            )}
           </div>
 
           {/* Activity timeline (informational only) */}

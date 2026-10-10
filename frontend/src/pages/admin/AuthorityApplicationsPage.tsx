@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Eye, RefreshCw, Search } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchAuthorityApplications } from '../../store/slices/adminSlice';
@@ -21,7 +21,14 @@ export default function AuthorityApplicationsPage() {
   const { applications, applicationsFetch } = useAppSelector((s) => s.admin);
 
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<(typeof STATUSES)[number]>('ALL');
+  // Deep-link support for overview StatCards: ?status=PENDING
+  const [params] = useSearchParams();
+  const initialStatus = (params.get('status')?.toUpperCase() ?? 'ALL') as 'ALL' | AuthorityVerificationStatus;
+  const [status, setStatus] = useState<'ALL' | AuthorityVerificationStatus>(
+    initialStatus === 'ALL' || initialStatus === 'PENDING' || initialStatus === 'VERIFIED' || initialStatus === 'REJECTED'
+      ? initialStatus
+      : 'ALL',
+  );
   const [department, setDepartment] = useState('ALL');
   const [date, setDate] = useState('');
 
