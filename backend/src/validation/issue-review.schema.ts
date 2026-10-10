@@ -55,14 +55,31 @@ export const issueIdSchema = z.uuid('Issue id must be a valid UUID');
  */
 export const issueListQuerySchema = z
   .object({
-    status: z.enum(ISSUE_REVIEW_STATUSES, {
-      error: `Status must be one of: ${ISSUE_REVIEW_STATUSES.join(', ')}`,
-    }),
-    limit: z.coerce
-      .number({ error: 'Limit must be a number' })
-      .int('Limit must be a whole number')
-      .min(1, 'Limit must be at least 1')
-      .max(ISSUE_LIST_MAX_LIMIT, `Limit must be at most ${ISSUE_LIST_MAX_LIMIT}`),
+    status: z
+      .preprocess(
+        (value) => {
+          if (typeof value !== 'string') return value;
+          const trimmed = value.trim();
+          return trimmed === '' ? undefined : trimmed;
+        },
+        z.enum(ISSUE_REVIEW_STATUSES, {
+          error: `Status must be one of: ${ISSUE_REVIEW_STATUSES.join(', ')}`,
+        }),
+      )
+      .optional(),
+    limit: z
+      .preprocess(
+        (value) => {
+          if (typeof value === 'string' && value.trim() === '') return undefined;
+          return value;
+        },
+        z.coerce
+          .number({ error: 'Limit must be a number' })
+          .int('Limit must be a whole number')
+          .min(1, 'Limit must be at least 1')
+          .max(ISSUE_LIST_MAX_LIMIT, `Limit must be at most ${ISSUE_LIST_MAX_LIMIT}`),
+      )
+      .optional(),
   })
   .strict();
 

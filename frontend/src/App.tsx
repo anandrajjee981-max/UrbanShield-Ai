@@ -20,6 +20,7 @@ import AdminSettingsPage from './pages/admin/AdminSettingsPage';
 import AdminNotFoundPage from './pages/admin/AdminNotFoundPage';
 import AuthorityDashboard from './pages/AuthorityDashboard';
 import AuthorityApplyPage from './pages/authority/AuthorityApplyPage';
+import AuthorityMyTasksPage from './pages/authority/AuthorityMyTasksPage';
 import AuthorityProfilePage from './pages/authority/AuthorityProfilePage';
 import DashboardRouter from './pages/DashboardRouter';
 import AiInsights from './pages/AiInsights';
@@ -88,6 +89,7 @@ function AppRoutes() {
           </Route>
           <Route element={<RoleRoute roles={['AUTHORITY']} />}>
             <Route path="/authority" element={<AuthorityDashboard />} />
+            <Route path="/authority/tasks" element={<AuthorityMyTasksPage />} />
           </Route>
           {/* Authority verification doorway — AUTHORITY role only (any status).
               No layout here: the outer AppLayout above already provides the

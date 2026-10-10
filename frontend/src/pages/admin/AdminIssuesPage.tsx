@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Eye, RefreshCw, Search } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchAdminIssues } from '../../store/slices/adminSlice';
@@ -25,7 +25,14 @@ export default function AdminIssuesPage() {
   const { issues, issuesFetch } = useAppSelector((s) => s.admin);
 
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<(typeof STATUSES)[number]>('ALL');
+  // Deep-link support for overview StatCards: /admin/issues?status=REPORTED
+  const [params] = useSearchParams();
+  const initialStatus = (params.get('status')?.toUpperCase() ?? 'ALL') as (typeof STATUSES)[number];
+  const [status, setStatus] = useState<'ALL' | AdminIssueStatus>(
+    initialStatus === 'ALL' || initialStatus === 'REPORTED' || initialStatus === 'VERIFIED' || initialStatus === 'REJECTED'
+      ? initialStatus
+      : 'ALL',
+  );
   const [category, setCategory] = useState('ALL');
   const [location, setLocation] = useState('');
   const [date, setDate] = useState('');

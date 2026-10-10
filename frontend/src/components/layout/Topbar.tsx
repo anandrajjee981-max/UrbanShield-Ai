@@ -125,7 +125,7 @@ export default function Topbar({ onSearch }: { onSearch?: (q: string) => void })
       : user?.role === 'AUTHORITY'
         ? [
           { label: 'Reports to Review', to: '/reports' },
-          { label: 'My Tasks', to: '/tasks' },
+          { label: 'My Tasks', to: '/authority/tasks' },
         ]
         : [{ label: 'My Reports', to: '/reports' }];
 

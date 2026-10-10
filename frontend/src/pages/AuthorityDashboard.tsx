@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchMyTasks } from '../store/slices/workflowSlice';
+import { fetchAssignedTasks } from '../store/slices/authorityTasksSlice';
 import { setGlobalSearch } from '../store/slices/uiSlice';
 import { backendIssueToIncident } from '../store/slices/incidentsSlice';
 import { useWeather } from '../hooks/useWeather';
@@ -109,6 +110,7 @@ export default function AuthorityDashboard() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { tasks, tasksLoading, error: workflowError } = useAppSelector((s) => s.workflow);
+  const taskCounts = useAppSelector((s) => s.authorityTasks.counts);
   const user = useAppSelector((s) => s.auth.user);
   const firstName = (user?.name ?? 'Officer').split(' ')[0];
   const [refreshedAt, setRefreshedAt] = useState<string | null>(null);
@@ -119,7 +121,7 @@ export default function AuthorityDashboard() {
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
-    await dispatch(fetchMyTasks());
+    await Promise.all([dispatch(fetchMyTasks()), dispatch(fetchAssignedTasks())]);
     setRefreshedAt(new Date().toISOString());
     setRefreshing(false);
   }, [dispatch]);
@@ -360,6 +362,32 @@ export default function AuthorityDashboard() {
             <button onClick={() => navigate('/tasks')}
               className="ml-auto inline-flex items-center gap-1.5 text-xs font-extrabold px-4 py-2.5 rounded-xl bg-brand text-white hover:bg-brand-warm transition-all duration-150 active:scale-95">
               Open Review Queue <ArrowRight size={13} />
+            </button>
+          </section>
+
+          {/* ── 5b · My Tasks widget (admin-assigned field work, clickable) ── */}
+          <section aria-label="My tasks">
+            <SectionHead eyebrow="Field work" title="My Tasks" sub="Assigned by admin — live counts." />
+            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                { label: 'Pending', n: taskCounts.pending },
+                { label: 'In Progress', n: taskCounts.inProgress },
+                { label: 'Overdue', n: taskCounts.overdue },
+                { label: 'Completed', n: taskCounts.completed },
+              ].map((c) => (
+                <button
+                  key={c.label}
+                  onClick={() => navigate('/authority/tasks')}
+                  className="bg-card border border-line rounded-2xl px-4 py-3 text-left hover:border-brand transition-colors"
+                >
+                  <p className={`text-2xl font-extrabold leading-none ${c.label === 'Overdue' && c.n > 0 ? 'text-brand' : ''}`}>{c.n}</p>
+                  <p className="text-[10px] font-extrabold uppercase tracking-wide text-mute mt-1.5">{c.label}</p>
+                </button>
+              ))}
+            </div>
+            <button onClick={() => navigate('/authority/tasks')}
+              className="mt-2 w-full inline-flex items-center justify-center gap-1.5 text-xs font-extrabold px-4 py-2.5 rounded-xl bg-brand text-white hover:bg-brand-warm transition-all duration-150 active:scale-95">
+              Open My Tasks <ArrowRight size={13} />
             </button>
           </section>
 
