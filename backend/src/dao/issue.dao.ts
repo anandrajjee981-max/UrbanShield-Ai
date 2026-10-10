@@ -46,19 +46,39 @@ const ISSUE_REVIEW_COLUMNS =
 
 /**
  * The admin monitoring read, joined to `users` for the account that filed the
- * report.
+ * report and to the issue's current assignment.
  *
  * `password_hash` is deliberately absent from the select list, and the mapping
  * (`toMonitoredIssue`) has no field that could carry it.
+ *
+ * The assignment join is a LATERAL sub-select for the newest non-cancelled
+ * `authority_tasks` row of the issue - whichever created it, the AI (Boss) or an
+ * admin. Without it the dashboard could never show who is handling an issue and
+ * rendered every AI-assigned issue as "Unassigned". A cancelled task is skipped
+ * so a revoked assignment does not keep the authority on screen.
  */
 const ISSUE_MONITORING_SELECT = `
   SELECT i.id, i.issue_type, i.description, i.image_url, i.location_type,
          i.latitude, i.longitude, i.address, i.status,
          i.verified_by, i.verified_at, i.rejected_by, i.rejected_at, i.rejection_reason,
          i.created_at, i.updated_at,
-         u.name AS citizen_name, u.email AS citizen_email
+         u.name AS citizen_name, u.email AS citizen_email,
+         t.authority_application_id AS assigned_to,
+         t.created_at AS assigned_at,
+         COALESCE(aa.full_name, au.name) AS assignee_name,
+         COALESCE(aa.email, au.email) AS assignee_email
   FROM issues i
-  JOIN users u ON u.id = i.user_id`;
+  JOIN users u ON u.id = i.user_id
+  LEFT JOIN LATERAL (
+    SELECT at.authority_application_id, at.created_at
+    FROM authority_tasks at
+    WHERE at.issue_id = i.id
+      AND at.status <> 'CANCELLED'
+    ORDER BY at.created_at DESC
+    LIMIT 1
+  ) t ON TRUE
+  LEFT JOIN authority_applications aa ON aa.id = t.authority_application_id
+  LEFT JOIN users au ON au.id = aa.user_id`;
 
 export const createIssue = async (data: CreateIssueData): Promise<Issue> => {
   const { rows } = await query<IssueRow>(

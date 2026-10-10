@@ -40,6 +40,11 @@ export interface IssueRow {
 export interface MonitoredIssueRow extends IssueRow {
   citizen_name: string;
   citizen_email: string;
+  /** Latest non-cancelled assignment of this issue, if any (authority_tasks). */
+  assigned_to: string | null;
+  assignee_name: string | null;
+  assignee_email: string | null;
+  assigned_at: Date | null;
 }
 
 /** Domain entity passed between DAO, service and controller. */
@@ -162,6 +167,15 @@ export interface MonitoredIssue extends AuthorityReviewIssue {
     name: string;
     email: string;
   };
+  /**
+   * The authority currently handling this issue, derived from the latest
+   * non-cancelled `authority_tasks` row (AI-assigned or admin-assigned).
+   * Null only when no authority has been assigned — that is the sole case the
+   * admin dashboard renders as "Unassigned".
+   */
+  assignedTo: string | null;
+  assignee: { name: string; email: string } | null;
+  assignedAt: Date | null;
 }
 
 /** Maps a raw database row to the domain entity. */
@@ -219,6 +233,11 @@ export const toMonitoredIssue = (row: MonitoredIssueRow): MonitoredIssue => ({
     name: row.citizen_name,
     email: row.citizen_email,
   },
+  assignedTo: row.assigned_to,
+  assignee: row.assignee_name
+    ? { name: row.assignee_name, email: row.assignee_email ?? '' }
+    : null,
+  assignedAt: row.assigned_at,
 });
 
 /**
