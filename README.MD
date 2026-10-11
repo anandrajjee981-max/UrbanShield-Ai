@@ -230,15 +230,13 @@ Access is controlled through the project's existing authentication and authoriza
 * Pending work can be recovered instead of requiring citizens to recreate reports.
 * Sensitive personal information is not needed for civic issue classification.
 
-## AWS Integration
+## Deployment & DevOps
 
-**AWS service or open-source tool:** [Add the actual service/tool used]
-
-**Purpose:** [Explain its role in the deployed application]
-
-**Deployment or evidence:** [Add the actual deployment URL or architecture evidence]
-
-Only include integrations that are genuinely implemented and demonstrable.
+* **Frontend:** Deployed on Vercel — https://urban-shield-ai-iota.vercel.app/
+* **Containerization:** Docker — used to package the application.
+* **Orchestration:** Kubernetes — used to practice deployment and service management.
+* **Database:** Neon PostgreSQL.
+* **AWS Integration:** No AWS service is currently integrated into the live application.
 
 ## Team
 
